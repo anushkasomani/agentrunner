@@ -1,0 +1,13 @@
+{
+    "name": "@agentrunner/skills",
+    "version": "0.1.0",
+    "type": "module",
+    "main": "dist/index.js",
+    "scripts": { "build": "tsc -p tsconfig.json" },
+    "dependencies": {
+      "@agentrunner/common": "0.1.0",
+      "node-fetch": "3.3.2",
+      "@solana/web3.js": "^2.0.0"
+    }
+  }
+  

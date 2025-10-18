@@ -1,0 +1,37 @@
+{
+  "name": "agentrunner",
+  "version": "1.0.0",
+  "description": "Solana Agent Runner - Multi-service architecture for agent execution and management",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "services/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "dev": "docker-compose up --build",
+    "dev:services": "concurrently \"npm run dev --workspace=services/runner\" \"npm run dev --workspace=services/planner-openai\" \"npm run dev --workspace=services/x402-merchant\" \"npm run dev --workspace=services/broker\" \"npm run dev --workspace=services/certifier\" \"npm run dev --workspace=services/api-gateway\"",
+    "dev:web": "npm run dev --workspace=apps/explorer-web",
+    "test": "npm run test --workspaces",
+    "lint": "eslint . --ext .ts,.tsx",
+    "lint:fix": "eslint . --ext .ts,.tsx --fix",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf node_modules packages/*/node_modules services/*/node_modules apps/*/node_modules",
+    "anchor:build": "cd programs/agent-registry && anchor build",
+    "anchor:deploy": "cd programs/agent-registry && anchor deploy",
+    "anchor:test": "cd programs/agent-registry && anchor test"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "concurrently": "^8.0.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

@@ -1,0 +1,146 @@
+# version: '3.8'
+
+# services:
+#   # Core Services
+#   runner:
+#     build: ./services/runner
+#     ports:
+#       - "3001:3001"
+#     environment:
+#       - NODE_ENV=development
+#       - DATABASE_URL=${DATABASE_URL}
+#       - SOLANA_RPC_URL=${SOLANA_RPC_URL}
+#       - SOLANA_PRIVATE_KEY=${SOLANA_PRIVATE_KEY}
+#     depends_on:
+#       - redis
+#       - postgres
+
+#   planner-openai:
+#     build: ./services/planner-openai
+#     ports:
+#       - "3002:3002"
+#     environment:
+#       - NODE_ENV=development
+#       - OPENAI_API_KEY=${OPENAI_API_KEY}
+#       - RUNNER_URL=http://runner:3001
+
+#   x402-merchant:
+#     build: ./services/x402-merchant
+#     ports:
+#       - "3003:3003"
+#     environment:
+#       - NODE_ENV=development
+#       - SOLANA_RPC_URL=${SOLANA_RPC_URL}
+#       - USDC_MINT=${USDC_MINT}
+
+#   broker:
+#     build: ./services/broker
+#     ports:
+#       - "3004:3004"
+#     environment:
+#       - NODE_ENV=development
+#       - DATABASE_URL=${DATABASE_URL}
+#       - REDIS_URL=redis://redis:6379
+
+#   certifier:
+#     build: ./services/certifier
+#     ports:
+#       - "3005:3005"
+#     environment:
+#       - NODE_ENV=development
+#       - DATABASE_URL=${DATABASE_URL}
+
+#   api-gateway:
+#     build: ./services/api-gateway
+#     ports:
+#       - "3000:3000"
+#     environment:
+#       - NODE_ENV=development
+#       - RUNNER_URL=http://runner:3001
+#       - PLANNER_URL=http://planner-openai:3002
+#       - BROKER_URL=http://broker:3004
+#       - CERTIFIER_URL=http://certifier:3005
+
+#   # Web Application
+#   explorer-web:
+#     build: ./apps/explorer-web
+#     ports:
+#       - "3006:3006"
+#     environment:
+#       - NODE_ENV=development
+#       - NEXT_PUBLIC_API_URL=http://localhost:3000
+
+#   # Infrastructure
+#   redis:
+#     image: redis:7-alpine
+#     ports:
+#       - "6379:6379"
+
+#   postgres:
+#     image: postgres:15-alpine
+#     ports:
+#       - "5432:5432"
+#     environment:
+#       - POSTGRES_DB=${POSTGRES_DB:-agentrunner}
+#       - POSTGRES_USER=${POSTGRES_USER:-postgres}
+#       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+#     volumes:
+#       - postgres_data:/var/lib/postgresql/data
+
+# volumes:
+#   postgres_data:
+
+
+
+version: "3.9"
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: agentrunner
+    ports: ["5432:5432"]
+
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+
+  runner:
+    build: ./services/runner
+    env_file: .env
+    depends_on: [redis, postgres]
+    ports: ["7001:7001"]
+
+  planner:
+    build: ./services/planner-openai
+    env_file: .env
+    ports: ["7002:7002"]
+
+  x402:
+    build: ./services/x402-merchant
+    env_file: .env
+    ports: ["7003:7003"]
+
+  broker:
+    build: ./services/broker
+    env_file: .env
+    depends_on: [postgres]
+    ports: ["7004:7004"]
+
+  certifier:
+    build: ./services/certifier
+    env_file: .env
+    depends_on: [runner, planner]
+    ports: ["7005:7005"]
+
+  api:
+    build: ./services/api-gateway
+    env_file: .env
+    depends_on: [runner, planner, x402, broker, certifier]
+    ports: ["8080:8080"]
+
+  explorer:
+    build: ./apps/explorer-web
+    env_file: .env
+    depends_on: [api]
+    ports: ["3000:3000"]
