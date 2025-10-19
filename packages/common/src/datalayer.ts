@@ -1,5 +1,3 @@
-
-
 import fetch from "node-fetch";
 const BASE = process.env.DATA_LAYER_URL;
 

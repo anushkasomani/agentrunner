@@ -1,10 +1,9 @@
-// X402 Merchant service for payment challenges
-
-import express from 'express';
+// X402 Merchant service for payment challengesimport express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
+import express from 'express'
 import { Connection, PublicKey, Keypair } from '@solana/web3.js';
 import { PaymentChallenge, PaymentVerification } from '@agentrunner/common';
 
