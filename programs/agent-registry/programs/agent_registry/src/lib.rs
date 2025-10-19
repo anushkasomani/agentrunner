@@ -1,249 +1,170 @@
 use anchor_lang::prelude::*;
 
-declare_id!("11111111111111111111111111111111");
+declare_id!("AGentReg1strY111111111111111111111111111111"); // REPLACE with your deployed AGENT_PROGRAM_ID
 
 #[program]
 pub mod agent_registry {
     use super::*;
 
-    pub fn initialize_registry(ctx: Context<InitializeRegistry>) -> Result<()> {
-        let registry = &mut ctx.accounts.registry;
-        registry.authority = ctx.accounts.authority.key();
-        registry.total_agents = 0;
-        registry.bump = ctx.bumps.registry;
-        Ok(())
-    }
+    /// Create an Agent record bound to an identity pubkey, owned by `owner`.
+    pub fn register_agent(ctx: Context<RegisterAgent>, identity: Pubkey, metadata_uri: String) -> Result<()> {
+        require!(metadata_uri.as_bytes().len() <= 200, RegistryError::MetadataTooLong);
 
-    pub fn register_agent(
-        ctx: Context<RegisterAgent>,
-        name: String,
-        description: String,
-        version: String,
-        skills: Vec<String>,
-    ) -> Result<()> {
         let agent = &mut ctx.accounts.agent;
-        let registry = &mut ctx.accounts.registry;
-
-        agent.id = registry.total_agents;
-        agent.name = name;
-        agent.description = description;
-        agent.version = version;
-        agent.skills = skills;
-        agent.owner = ctx.accounts.authority.key();
+        agent.identity = identity;
+        agent.owner = ctx.accounts.owner.key();
+        agent.metadata_uri = metadata_uri;
+        agent.bump = *ctx.bumps.get("agent").unwrap();
         agent.created_at = Clock::get()?.unix_timestamp;
-        agent.is_active = true;
-        agent.bump = ctx.bumps.agent;
-
-        registry.total_agents += 1;
-
-        emit!(AgentRegistered {
-            agent_id: agent.id,
-            owner: agent.owner,
-            name: agent.name.clone(),
-        });
-
         Ok(())
     }
 
-    pub fn update_agent(
-        ctx: Context<UpdateAgent>,
-        name: Option<String>,
-        description: Option<String>,
-        version: Option<String>,
-        skills: Option<Vec<String>>,
-    ) -> Result<()> {
-        let agent = &mut ctx.accounts.agent;
-
-        if let Some(name) = name {
-            agent.name = name;
-        }
-        if let Some(description) = description {
-            agent.description = description;
-        }
-        if let Some(version) = version {
-            agent.version = version;
-        }
-        if let Some(skills) = skills {
-            agent.skills = skills;
-        }
-
-        agent.updated_at = Clock::get()?.unix_timestamp;
-
-        emit!(AgentUpdated {
-            agent_id: agent.id,
-            owner: agent.owner,
-        });
-
+    /// Update the agent's metadata (only the owner).
+    pub fn update_agent(ctx: Context<UpdateAgent>, metadata_uri: String) -> Result<()> {
+        require!(metadata_uri.as_bytes().len() <= 200, RegistryError::MetadataTooLong);
+        require_keys_eq!(ctx.accounts.owner.key(), ctx.accounts.agent.owner, RegistryError::Unauthorized);
+        ctx.accounts.agent.metadata_uri = metadata_uri;
         Ok(())
     }
 
-    pub fn deactivate_agent(ctx: Context<DeactivateAgent>) -> Result<()> {
-        let agent = &mut ctx.accounts.agent;
-        agent.is_active = false;
-        agent.updated_at = Clock::get()?.unix_timestamp;
-
-        emit!(AgentDeactivated {
-            agent_id: agent.id,
-            owner: agent.owner,
-        });
-
+    /// Post a daily validation (e.g., Merkle root of receipts). Any signer can validate; trust is off-chain.
+    pub fn post_validation(ctx: Context<PostValidation>, day_yyyymmdd: u32, merkle_root: [u8; 32]) -> Result<()> {
+        let v = &mut ctx.accounts.validation;
+        v.identity = ctx.accounts.agent.identity;
+        v.validator = ctx.accounts.validator.key();
+        v.day_yyyymmdd = day_yyyymmdd;
+        v.merkle_root = merkle_root;
+        v.bump = *ctx.bumps.get("validation").unwrap();
+        v.ts = Clock::get()?.unix_timestamp;
         Ok(())
     }
 
-    pub fn anchor_merkle_root(
-        ctx: Context<AnchorMerkleRoot>,
-        plan_id: String,
-        merkle_root: [u8; 32],
-    ) -> Result<()> {
-        let merkle_account = &mut ctx.accounts.merkle_account;
-        
-        merkle_account.plan_id = plan_id;
-        merkle_account.root = merkle_root;
-        merkle_account.anchored_at = Clock::get()?.unix_timestamp;
-        merkle_account.authority = ctx.accounts.authority.key();
-        merkle_account.bump = ctx.bumps.merkle_account;
-
-        emit!(MerkleRootAnchored {
-            plan_id: merkle_account.plan_id.clone(),
-            root: merkle_account.root,
-            authority: merkle_account.authority,
-        });
-
+    /// Create or update feedback (rating 0-100, optional tag bucket). One per (reviewer, identity).
+    pub fn post_feedback(ctx: Context<PostFeedback>, rating: u8, tag: u8) -> Result<()> {
+        require!(rating <= 100, RegistryError::BadRating);
+        let f = &mut ctx.accounts.feedback;
+        f.identity = ctx.accounts.agent.identity;
+        f.reviewer = ctx.accounts.reviewer.key();
+        f.rating = rating;
+        f.tag = tag;
+        f.bump = *ctx.bumps.get("feedback").unwrap();
+        f.ts = Clock::get()?.unix_timestamp;
         Ok(())
     }
 }
 
 #[derive(Accounts)]
-pub struct InitializeRegistry<'info> {
-    #[account(
-        init,
-        payer = authority,
-        space = 8 + Registry::INIT_SPACE,
-        seeds = [b"registry"],
-        bump
-    )]
-    pub registry: Account<'info, Registry>,
-    #[account(mut)]
-    pub authority: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
+#[instruction(identity: Pubkey)]
 pub struct RegisterAgent<'info> {
+    #[account(mut)]
+    pub owner: Signer<'info>,
+
     #[account(
         init,
-        payer = authority,
-        space = 8 + Agent::INIT_SPACE,
-        seeds = [b"agent", registry.total_agents.to_le_bytes().as_ref()],
+        payer = owner,
+        space = 8 + Agent::SIZE,
+        seeds = [b"agent", identity.as_ref()],
         bump
     )]
     pub agent: Account<'info, Agent>,
-    #[account(
-        mut,
-        seeds = [b"registry"],
-        bump = registry.bump
-    )]
-    pub registry: Account<'info, Registry>,
-    #[account(mut)]
-    pub authority: Signer<'info>,
+
     pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
 pub struct UpdateAgent<'info> {
-    #[account(
-        mut,
-        seeds = [b"agent", agent.id.to_le_bytes().as_ref()],
-        bump = agent.bump,
-        constraint = agent.owner == authority.key()
-    )]
+    #[account(mut)]
+    pub owner: Signer<'info>,
+
+    #[account(mut)]
     pub agent: Account<'info, Agent>,
-    pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
-pub struct DeactivateAgent<'info> {
-    #[account(
-        mut,
-        seeds = [b"agent", agent.id.to_le_bytes().as_ref()],
-        bump = agent.bump,
-        constraint = agent.owner == authority.key()
-    )]
-    pub agent: Account<'info, Agent>,
-    pub authority: Signer<'info>,
-}
+#[instruction(day_yyyymmdd: u32)]
+pub struct PostValidation<'info> {
+    /// Validator posting the root (could be the runner or an external auditor)
+    pub validator: Signer<'info>,
 
-#[derive(Accounts)]
-#[instruction(plan_id: String)]
-pub struct AnchorMerkleRoot<'info> {
+    /// Ensure the agent exists
+    pub agent: Account<'info, Agent>,
+
     #[account(
         init,
-        payer = authority,
-        space = 8 + MerkleAccount::INIT_SPACE,
-        seeds = [b"merkle", plan_id.as_bytes()],
+        payer = validator,
+        space = 8 + Validation::SIZE,
+        seeds = [b"validation", agent.identity.as_ref(), &day_yyyymmdd.to_le_bytes()],
         bump
     )]
-    pub merkle_account: Account<'info, MerkleAccount>,
-    #[account(mut)]
-    pub authority: Signer<'info>,
+    pub validation: Account<'info, Validation>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct PostFeedback<'info> {
+    pub reviewer: Signer<'info>,
+    pub agent: Account<'info, Agent>,
+
+    #[account(
+        init_if_needed,
+        payer = reviewer,
+        space = 8 + Feedback::SIZE,
+        seeds = [b"feedback", agent.identity.as_ref(), reviewer.key.as_ref()],
+        bump
+    )]
+    pub feedback: Account<'info, Feedback>,
+
     pub system_program: Program<'info, System>,
 }
 
 #[account]
-#[derive(InitSpace)]
-pub struct Registry {
-    pub authority: Pubkey,
-    pub total_agents: u64,
-    pub bump: u8,
-}
-
-#[account]
-#[derive(InitSpace)]
 pub struct Agent {
-    pub id: u64,
-    pub name: String,
-    pub description: String,
-    pub version: String,
-    pub skills: Vec<String>,
+    pub identity: Pubkey,
     pub owner: Pubkey,
-    pub created_at: i64,
-    pub updated_at: i64,
-    pub is_active: bool,
+    pub metadata_uri: String,
     pub bump: u8,
+    pub created_at: i64,
+}
+impl Agent {
+    // 32 + 32 + (4 + 200) + 1 + 8
+    pub const SIZE: usize = 32 + 32 + 4 + 200 + 1 + 8;
 }
 
 #[account]
-#[derive(InitSpace)]
-pub struct MerkleAccount {
-    pub plan_id: String,
-    pub root: [u8; 32],
-    pub anchored_at: i64,
-    pub authority: Pubkey,
+pub struct Validation {
+    pub identity: Pubkey,
+    pub validator: Pubkey,
+    pub day_yyyymmdd: u32,
+    pub merkle_root: [u8; 32],
     pub bump: u8,
+    pub ts: i64,
+}
+impl Validation {
+    // 32 + 32 + 4 + 32 + 1 + 8
+    pub const SIZE: usize = 32 + 32 + 4 + 32 + 1 + 8;
 }
 
-#[event]
-pub struct AgentRegistered {
-    pub agent_id: u64,
-    pub owner: Pubkey,
-    pub name: String,
+#[account]
+pub struct Feedback {
+    pub identity: Pubkey,
+    pub reviewer: Pubkey,
+    pub rating: u8,
+    pub tag: u8,
+    pub bump: u8,
+    pub ts: i64,
+}
+impl Feedback {
+    // 32 + 32 + 1 + 1 + 1 + 8
+    pub const SIZE: usize = 32 + 32 + 1 + 1 + 1 + 8;
 }
 
-#[event]
-pub struct AgentUpdated {
-    pub agent_id: u64,
-    pub owner: Pubkey,
-}
-
-#[event]
-pub struct AgentDeactivated {
-    pub agent_id: u64,
-    pub owner: Pubkey,
-}
-
-#[event]
-pub struct MerkleRootAnchored {
-    pub plan_id: String,
-    pub root: [u8; 32],
-    pub authority: Pubkey,
+#[error_code]
+pub enum RegistryError {
+    #[msg("metadata uri too long")]
+    MetadataTooLong,
+    #[msg("unauthorized")]
+    Unauthorized,
+    #[msg("rating must be 0..=100")]
+    BadRating,
 }

@@ -1,15 +1,23 @@
-[programs.devnet]
-agent_registry = "11111111111111111111111111111111"
+[toolchain]
+anchor_version = "0.29.0"
 
-[programs.mainnet]
-agent_registry = "11111111111111111111111111111111"
+[features]
+seeds = true
+skip-lint = false
+
+[programs.localnet]
+agent_registry = "<AGENT_PROGRAM_ID>"
+
+[programs.devnet]
+agent_registry = "<AGENT_PROGRAM_ID>"
 
 [registry]
-url = "https://api.apr.dev"
+url = "https://anchor.projectserum.com"
 
 [provider]
 cluster = "Devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+test = "node"
+

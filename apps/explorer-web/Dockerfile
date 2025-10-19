@@ -21,3 +21,4 @@ EXPOSE 3006
 
 # Start the application
 CMD ["npm", "start"]
+

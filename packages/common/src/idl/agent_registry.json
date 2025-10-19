@@ -1,370 +1,107 @@
 {
   "version": "0.1.0",
   "name": "agent_registry",
+  "metadata": {
+    "address": "<AGENT_PROGRAM_ID>"
+  },
   "instructions": [
-    {
-      "name": "initializeRegistry",
-      "accounts": [
-        {
-          "name": "registry",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    },
     {
       "name": "registerAgent",
       "accounts": [
-        {
-          "name": "agent",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "registry",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
+        { "name": "owner", "isMut": true, "isSigner": true },
+        { "name": "agent", "isMut": true, "isSigner": false },
+        { "name": "systemProgram", "isMut": false, "isSigner": false }
       ],
       "args": [
-        {
-          "name": "name",
-          "type": "string"
-        },
-        {
-          "name": "description",
-          "type": "string"
-        },
-        {
-          "name": "version",
-          "type": "string"
-        },
-        {
-          "name": "skills",
-          "type": {
-            "vec": "string"
-          }
-        }
+        { "name": "identity", "type": "publicKey" },
+        { "name": "metadataUri", "type": "string" }
       ]
     },
     {
       "name": "updateAgent",
       "accounts": [
-        {
-          "name": "agent",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
+        { "name": "owner", "isMut": true, "isSigner": true },
+        { "name": "agent", "isMut": true, "isSigner": false }
       ],
       "args": [
-        {
-          "name": "name",
-          "type": {
-            "option": "string"
-          }
-        },
-        {
-          "name": "description",
-          "type": {
-            "option": "string"
-          }
-        },
-        {
-          "name": "version",
-          "type": {
-            "option": "string"
-          }
-        },
-        {
-          "name": "skills",
-          "type": {
-            "option": {
-              "vec": "string"
-            }
-          }
-        }
+        { "name": "metadataUri", "type": "string" }
       ]
     },
     {
-      "name": "deactivateAgent",
+      "name": "postValidation",
       "accounts": [
-        {
-          "name": "agent",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "anchorMerkleRoot",
-      "accounts": [
-        {
-          "name": "merkleAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
+        { "name": "validator", "isMut": false, "isSigner": true },
+        { "name": "agent", "isMut": false, "isSigner": false },
+        { "name": "validation", "isMut": true, "isSigner": false },
+        { "name": "systemProgram", "isMut": false, "isSigner": false }
       ],
       "args": [
-        {
-          "name": "planId",
-          "type": "string"
-        },
-        {
-          "name": "merkleRoot",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        }
+        { "name": "dayYyyymmdd", "type": "u32" },
+        { "name": "merkleRoot", "type": { "array": ["u8", 32] } }
+      ]
+    },
+    {
+      "name": "postFeedback",
+      "accounts": [
+        { "name": "reviewer", "isMut": true, "isSigner": true },
+        { "name": "agent", "isMut": false, "isSigner": false },
+        { "name": "feedback", "isMut": true, "isSigner": false },
+        { "name": "systemProgram", "isMut": false, "isSigner": false }
+      ],
+      "args": [
+        { "name": "rating", "type": "u8" },
+        { "name": "tag", "type": "u8" }
       ]
     }
   ],
   "accounts": [
     {
-      "name": "Registry",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "authority",
-            "type": "publicKey"
-          },
-          {
-            "name": "totalAgents",
-            "type": "u64"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
       "name": "Agent",
       "type": {
         "kind": "struct",
         "fields": [
-          {
-            "name": "id",
-            "type": "u64"
-          },
-          {
-            "name": "name",
-            "type": "string"
-          },
-          {
-            "name": "description",
-            "type": "string"
-          },
-          {
-            "name": "version",
-            "type": "string"
-          },
-          {
-            "name": "skills",
-            "type": {
-              "vec": "string"
-            }
-          },
-          {
-            "name": "owner",
-            "type": "publicKey"
-          },
-          {
-            "name": "createdAt",
-            "type": "i64"
-          },
-          {
-            "name": "updatedAt",
-            "type": "i64"
-          },
-          {
-            "name": "isActive",
-            "type": "bool"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
+          { "name": "identity", "type": "publicKey" },
+          { "name": "owner", "type": "publicKey" },
+          { "name": "metadataUri", "type": "string" },
+          { "name": "bump", "type": "u8" },
+          { "name": "createdAt", "type": "i64" }
         ]
       }
     },
     {
-      "name": "MerkleAccount",
+      "name": "Validation",
       "type": {
         "kind": "struct",
         "fields": [
-          {
-            "name": "planId",
-            "type": "string"
-          },
-          {
-            "name": "root",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "anchoredAt",
-            "type": "i64"
-          },
-          {
-            "name": "authority",
-            "type": "publicKey"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
+          { "name": "identity", "type": "publicKey" },
+          { "name": "validator", "type": "publicKey" },
+          { "name": "dayYyyymmdd", "type": "u32" },
+          { "name": "merkleRoot", "type": { "array": ["u8", 32] } },
+          { "name": "bump", "type": "u8" },
+          { "name": "ts", "type": "i64" }
+        ]
+      }
+    },
+    {
+      "name": "Feedback",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "identity", "type": "publicKey" },
+          { "name": "reviewer", "type": "publicKey" },
+          { "name": "rating", "type": "u8" },
+          { "name": "tag", "type": "u8" },
+          { "name": "bump", "type": "u8" },
+          { "name": "ts", "type": "i64" }
         ]
       }
     }
   ],
-  "events": [
-    {
-      "name": "AgentRegistered",
-      "fields": [
-        {
-          "name": "agentId",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "owner",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "name",
-          "type": "string",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "AgentUpdated",
-      "fields": [
-        {
-          "name": "agentId",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "owner",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "AgentDeactivated",
-      "fields": [
-        {
-          "name": "agentId",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "owner",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "MerkleRootAnchored",
-      "fields": [
-        {
-          "name": "planId",
-          "type": "string",
-          "index": false
-        },
-        {
-          "name": "root",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          },
-          "index": false
-        },
-        {
-          "name": "authority",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    }
-  ],
   "errors": [
-    {
-      "code": 6000,
-      "name": "Unauthorized",
-      "msg": "You are not authorized to perform this action"
-    },
-    {
-      "code": 6001,
-      "name": "AgentNotFound",
-      "msg": "Agent not found"
-    },
-    {
-      "code": 6002,
-      "name": "AgentAlreadyExists",
-      "msg": "Agent already exists"
-    },
-    {
-      "code": 6003,
-      "name": "InvalidInput",
-      "msg": "Invalid input provided"
-    }
+    { "code": 6000, "name": "MetadataTooLong", "msg": "metadata uri too long" },
+    { "code": 6001, "name": "Unauthorized", "msg": "unauthorized" },
+    { "code": 6002, "name": "BadRating", "msg": "rating must be 0..=100" }
   ]
 }
+
+
