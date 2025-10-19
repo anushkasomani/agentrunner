@@ -1,32 +1,16 @@
 {
   "name": "@agentrunner/x402-merchant",
-  "version": "1.0.0",
-  "description": "402 payment challenge/verify/refund service",
+  "version": "0.1.0",
+  "type": "module",
   "main": "dist/server.js",
-  "scripts": {
-    "build": "tsc",
-    "dev": "tsx watch src/server.ts",
-    "start": "node dist/server.js",
-    "clean": "rm -rf dist",
-    "type-check": "tsc --noEmit"
-  },
+  "scripts": { "build": "tsc -p tsconfig.json", "dev": "node --watch dist/server.js" },
   "dependencies": {
-    "@agentrunner/common": "0.1.0",
-    "express": "^4.18.0",
-    "cors": "^2.8.5",
-    "helmet": "^7.0.0",
-    "morgan": "^1.10.0",
-    "dotenv": "^16.0.0",
-    "@solana/web3.js": "^1.87.0",
-    "@solana/spl-token": "^0.3.8",
-    "winston": "^3.10.0"
-  },
-  "devDependencies": {
-    "@types/express": "^4.17.0",
-    "@types/cors": "^2.8.0",
-    "@types/morgan": "^1.9.0",
-    "@types/node": "^20.0.0",
-    "tsx": "^4.0.0",
-    "typescript": "^5.0.0"
+  "express": "4.19.2",
+  "uuid": "9.0.1",
+  "node-fetch": "3.3.2",
+  "@solana/web3.js": "1.95.3",
+  "@solana/spl-token": "0.4.8"
   }
-}
+  }
+  
+  

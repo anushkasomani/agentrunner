@@ -1,199 +1,106 @@
-// X402 Merchant service for payment challengesimport express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import dotenv from 'dotenv';
-import express from 'express'
-import { Connection, PublicKey, Keypair } from '@solana/web3.js';
-import { PaymentChallenge, PaymentVerification } from '@agentrunner/common';
-
-dotenv.config();
+import express from "express";
+import { v4 as uuid } from "uuid";
+import fetch from "node-fetch";
+import { Connection, PublicKey, Keypair, sendAndConfirmTransaction, Transaction } from "@solana/web3.js";
+import { getAssociatedTokenAddress, createTransferInstruction } from "@solana/spl-token";
 
 const app = express();
-const PORT = process.env.PORT || 3003;
-
-// Initialize Solana connection
-const connection = new Connection(
-  process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com',
-  'confirmed'
-);
-
-const USDC_MINT = new PublicKey(process.env.USDC_MINT || '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
-
-// Middleware
-app.use(helmet());
-app.use(cors());
-app.use(morgan('combined'));
 app.use(express.json());
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'healthy', 
-    timestamp: new Date().toISOString(),
-    service: 'x402-merchant'
-  });
+const CURRENCY = process.env.X402_CURRENCY || "USDC";
+const PAYTO_MINT = new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"); // USDC mint (devnet/mainnet)
+const PAYTO_ADDRESS = new PublicKey("51j3b8cZkYwAeKA47rEGWs8vLm12RD82yAgHhYYhyimr"); // merchant USDC token account
+const RPC = process.env.SOLANA_RPC_URL! || "https://wild-late-season.solana-devnet.quiknode.pro/b0ebcc50a76d22c777b9f18945f0d47e9f71ccaf";
+const conn = new Connection(RPC, "confirmed");
+
+// Load merchant signer for refunds
+// const MERCHANT_PRIV = Uint8Array.from(JSON.parse(process.env.FEE_PAYER_SECRET_KEY!));
+// const MERCHANT = Keypair.fromSecretKey(MERCHANT_PRIV);
+
+type Invoice = { id: string; price_usd: number; currency: string; expires_at: number; paid?: boolean };
+const INVOICES = new Map<string, Invoice>();
+
+app.get("/price", (req, res) => {
+const capability = String(req.query.capability || "generic");
+const price = capability.includes("swap") ? 0.10 : 0.05;
+res.set({
+"X-402-Price": price.toFixed(2),
+"X-402-Currency": CURRENCY,
+"X-402-Description": `${capability} run (max 1 tx)`
+});
+res.json({ capability, price_usd: price, currency: CURRENCY });
 });
 
-// Create payment challenge
-app.post('/challenge', async (req, res) => {
-  try {
-    const { amount, recipient, expiresIn } = req.body;
-    
-    if (!amount || !recipient) {
-      return res.status(400).json({ error: 'Amount and recipient are required' });
-    }
-
-    const challenge = await createPaymentChallenge(amount, recipient, expiresIn);
-    
-    res.json(challenge);
-  } catch (error) {
-    console.error('Error creating payment challenge:', error);
-    res.status(500).json({ error: 'Failed to create payment challenge' });
-  }
+app.post("/invoice", (req, res) => {
+const { price_usd } = req.body || {};
+const id = `inv_${uuid()}`;
+const inv = { id, price_usd: Number(price_usd ?? 0.10), currency: CURRENCY, expires_at: Math.floor(Date.now()/1000)+600, paid:false };
+INVOICES.set(id, inv);
+res.status(402).set({
+"X-402-Price": inv.price_usd.toFixed(2),
+"X-402-Currency": inv.currency,
+"X-402-Invoice": inv.id,
+"X-402-PayTo": PAYTO_ADDRESS.toBase58()
+}).json(inv);
 });
 
-async function createPaymentChallenge(
-  amount: number,
-  recipient: string,
-  expiresIn: number = 3600
-): Promise<PaymentChallenge> {
-  const challengeId = `challenge_${Date.now()}_${Math.random().toString(36).substring(2)}`;
-  const challenge = `pay_${amount}_usdc_to_${recipient}_${challengeId}`;
-  
-  const paymentChallenge: PaymentChallenge = {
-    id: challengeId,
-    amount,
-    currency: 'USDC',
-    recipient,
-    challenge,
-    expiresAt: new Date(Date.now() + expiresIn * 1000)
-  };
+app.post("/verify", async (req, res) => {
+const { invoice, proof } = req.body || {};
+const inv = INVOICES.get(String(invoice));
+if (!inv) return res.status(400).json({ ok:false, error:"bad invoice" });
+if (inv.paid) return res.json({ ok:true, invoice, status:"already_verified" });
 
-  // Store challenge (in production, use database)
-  // For now, just return the challenge
-  
-  return paymentChallenge;
-}
+try {
+if (proof?.chain !== "solana") throw new Error("chain must be solana");
+const tx = await conn.getTransaction(proof.txid, { maxSupportedTransactionVersion: 0, commitment: "confirmed" });
+if (!tx?.meta) throw new Error("tx not found or no meta");
 
-// Verify payment
-app.post('/verify', async (req, res) => {
-  try {
-    const { challengeId, transactionId } = req.body;
-    
-    if (!challengeId || !transactionId) {
-      return res.status(400).json({ error: 'Challenge ID and transaction ID are required' });
-    }
 
-    const verification = await verifyPayment(challengeId, transactionId);
-    
-    res.json(verification);
-  } catch (error) {
-    console.error('Error verifying payment:', error);
-    res.status(500).json({ error: 'Failed to verify payment' });
-  }
-});
+// naive check: ensure our token account received >= expected amount of the given mint
+const post = tx.meta.postTokenBalances || [];
+const pre = tx.meta.preTokenBalances || [];
 
-async function verifyPayment(
-  challengeId: string,
-  transactionId: string
-): Promise<PaymentVerification> {
-  try {
-    // Get transaction details
-    const transaction = await connection.getTransaction(transactionId, {
-      commitment: 'confirmed'
-    });
-
-    if (!transaction) {
-      return {
-        challengeId,
-        transactionId,
-        verified: false,
-        timestamp: new Date()
-      };
-    }
-
-    // Verify transaction contains USDC transfer
-    // This is a simplified verification - in production, you'd:
-    // 1. Parse the transaction instructions
-    // 2. Check for USDC transfer to the correct recipient
-    // 3. Verify the amount matches the challenge
-    
-    const verified = true; // Mock verification
-    
-    return {
-      challengeId,
-      transactionId,
-      verified,
-      timestamp: new Date()
-    };
-  } catch (error) {
-    console.error('Error verifying payment:', error);
-    return {
-      challengeId,
-      transactionId,
-      verified: false,
-      timestamp: new Date()
-    };
+let received = 0;
+for (const pb of post) {
+  const acc = tx.transaction.message.staticAccountKeys[pb.accountIndex].toBase58();
+  if (acc === PAYTO_ADDRESS.toBase58() && pb.mint === proof.mint) {
+    const preMatch = pre.find(x => x.accountIndex === pb.accountIndex);
+    const delta = Number(pb.uiTokenAmount.uiAmount || 0) - Number(preMatch?.uiTokenAmount.uiAmount || 0);
+    if (delta > 0) received += delta;
   }
 }
+if (received + 1e-9 < Number(proof.amount)) throw new Error(`payment shortfall: ${received} < ${proof.amount}`);
 
-// Get challenge status
-app.get('/challenge/:challengeId', async (req, res) => {
-  try {
-    const { challengeId } = req.params;
-    
-    // In production, fetch from database
-    const challenge = {
-      id: challengeId,
-      status: 'pending',
-      createdAt: new Date(),
-      expiresAt: new Date(Date.now() + 3600 * 1000)
-    };
-    
-    res.json(challenge);
-  } catch (error) {
-    console.error('Error getting challenge:', error);
-    res.status(500).json({ error: 'Failed to get challenge' });
-  }
+inv.paid = true;
+return res.json({ ok:true, invoice, status:"verified" });
+
+} catch (e:any) {
+return res.status(400).json({ ok:false, error: e.message });
+}
 });
 
-// Process refund
-app.post('/refund', async (req, res) => {
-  try {
-    const { challengeId, reason } = req.body;
-    
-    if (!challengeId) {
-      return res.status(400).json({ error: 'Challenge ID is required' });
-    }
+app.get("/get_invoices", async(req, res)=>{
+  // Convert Map to object for JSON serialization
+  const invoicesObject = Object.fromEntries(INVOICES);
+  return res.json({ok:true, invoices: invoicesObject})
+})
 
-    // Process refund logic
-    const refund = {
-      challengeId,
-      refundId: `refund_${Date.now()}`,
-      amount: 0, // Would be fetched from challenge
-      reason: reason || 'Requested refund',
-      status: 'processed',
-      timestamp: new Date()
-    };
-    
-    res.json(refund);
-  } catch (error) {
-    console.error('Error processing refund:', error);
-    res.status(500).json({ error: 'Failed to process refund' });
-  }
-});
-
-// Error handling
-app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Unhandled error:', error);
-  res.status(500).json({ error: 'Internal server error' });
-});
-
-app.listen(PORT, () => {
-  console.log(`X402 Merchant service listening on port ${PORT}`);
-});
-
-export default app;
-
-
+// app.post("/refund", async (req, res) => {
+//   const { invoice, to, amount } = req.body || {};
+//   const inv = INVOICES.get(String(invoice));
+//   if (!inv) return res.status(400).json({ ok:false, error:"bad invoice" });
+  
+//   try {
+//   const destOwner = new PublicKey(to);
+//   const destAta = await getAssociatedTokenAddress(PAYTO_MINT, destOwner, false);
+//   const ix = createTransferInstruction(PAYTO_ADDRESS, destAta, MERCHANT.publicKey, Number(amount) * 1_000_000); // 6 decimals
+//   const tx = new Transaction().add(ix);
+//   const sig = await sendAndConfirmTransaction(conn, tx, [MERCHANT], { skipPreflight: false });
+//   res.json({ ok:true, txid: sig });
+//   } catch (e:any) {
+//   res.status(400).json({ ok:false, error: e.message });
+//   }
+//   });
+  
+app.listen(7003, ()=> console.log("x402 Merchant listening on :7003"));
+  
