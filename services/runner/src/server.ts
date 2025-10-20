@@ -1,6 +1,7 @@
+import "dotenv/config";
 import express from "express";
 import { v4 as uuid } from "uuid";
-import { GuardConfigSchema, Receipt } from "@agentrunner/common/types";
+import { GuardConfigSchema, type Receipt } from "@agentrunner/common/types";
 import { signReceipt } from "@agentrunner/common/receipts";
 import { buildDailyMerkle } from "@agentrunner/common/merkle";
 import { swap, rebalance } from "@agentrunner/skills";
@@ -22,7 +23,7 @@ app.post("/run/skill/swap", async (req, res) => {
     });
 
     const receipt: Receipt = {
-      runner_pubkey: process.env.RUNNER_PUBKEY!,
+      runner_pubkey: process.env.RUNNER_PUBKEY || "51j3b8cZkYwAeKA47rEGWs8vLm12RD82yAgHhYYhyimr",
       agent: "swap",
       task_id: uuid(),
       when_unix: Math.floor(Date.now()/1000),

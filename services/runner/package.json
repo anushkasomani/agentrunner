@@ -3,14 +3,18 @@
   "version": "0.1.0",
   "type": "module",
   "main": "dist/server.js",
-  "scripts": { "build": "tsc -p tsconfig.json", "dev": "node --watch dist/server.js" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "node --watch dist/server.js"
+  },
   "dependencies": {
     "@agentrunner/common": "0.1.0",
     "@agentrunner/skills": "0.1.0",
+    "bullmq": "^4.15.0",
+    "dotenv": "^16.6.1",
     "express": "4.19.2",
-    "node-fetch": "3.3.2",
     "ioredis": "5.4.1",
-    "uuid": "9.0.1",
-    "bullmq": "^4.15.0"
+    "node-fetch": "3.3.2",
+    "uuid": "9.0.1"
   }
 }
