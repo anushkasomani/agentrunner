@@ -1,1 +1,13 @@
-{ "extends": "../../tsconfig.base.json", "include": ["src/**/*"] }
+{ 
+  "extends": "../../tsconfig.base.json", 
+  "include": ["src/**/*"],
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@agentrunner/common": ["../../packages/common/src"],
+      "@agentrunner/common/*": ["../../packages/common/src/*"],
+      "@agentrunner/skills": ["../../packages/skills/src"],
+      "@agentrunner/skills/*": ["../../packages/skills/src/*"]
+    }
+  }
+}

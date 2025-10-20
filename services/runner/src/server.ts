@@ -1,10 +1,10 @@
 import express from "express";
 import { v4 as uuid } from "uuid";
-import { GuardConfigSchema, Receipt } from "@agentrunner/common/types.js";
-import { signReceipt } from "@agentrunner/common/receipts.js";
-import { buildDailyMerkle } from "@agentrunner/common/merkle.js";
-import { swap, rebalance } from "@agentrunner/skills/index.js";
-import { dlPostReceipt } from "@agentrunner/common/datalayer.js";
+import { GuardConfigSchema, Receipt } from "@agentrunner/common/types";
+import { signReceipt } from "@agentrunner/common/receipts";
+import { buildDailyMerkle } from "@agentrunner/common/merkle";
+import { swap, rebalance } from "@agentrunner/skills";
+import { dlPostReceipt } from "@agentrunner/common/datalayer";
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));

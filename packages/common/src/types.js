@@ -1,25 +1,31 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.PlanSchema = exports.GuardConfigSchema = void 0;
-var zod_1 = require("zod");
+import { z } from "zod";
 /** Guard profile enforced pre-sign (infra, not agent code) */
-exports.GuardConfigSchema = zod_1.z.object({
-    freshness_s: zod_1.z.number().int().min(1).default(5),
-    slippage_bps_max: zod_1.z.number().int().min(1).default(50),
-    price_dev_max: zod_1.z.number().min(0).default(0.01),
-    fee_sol_max: zod_1.z.number().min(0).default(0.01),
-    notional_usd_max: zod_1.z.number().min(0).default(5000)
+export const GuardConfigSchema = z.object({
+    freshness_s: z.number().int().min(1).default(5),
+    slippage_bps_max: z.number().int().min(1).default(50),
+    price_dev_max: z.number().min(0).default(0.01),
+    fee_sol_max: z.number().min(0).default(0.01),
+    notional_usd_max: z.number().min(0).default(5000)
 });
 /** Plan emitted by planner (OpenAI) */
-exports.PlanSchema = zod_1.z.object({
-    plan_id: zod_1.z.string(),
-    steps: zod_1.z.array(zod_1.z.object({
-        type: zod_1.z.enum(["rfp", "skill"]),
-        capability: zod_1.z.string().optional(),
-        name: zod_1.z.string().optional(),
-        inputs: zod_1.z.record(zod_1.z.any()).optional(),
-        constraints: zod_1.z.record(zod_1.z.any()).optional(),
-        budget_usd: zod_1.z.number().optional(),
-        slo: zod_1.z.record(zod_1.z.any()).optional()
+export const PlanSchema = z.object({
+    plan_id: z.string(),
+    steps: z.array(z.object({
+        type: z.enum(["rfp", "skill"]),
+        capability: z.string().optional(),
+        name: z.string().optional(),
+        inputs: z.record(z.any()).optional(),
+        constraints: z.record(z.any()).optional(),
+        budget_usd: z.number().optional(),
+        slo: z.record(z.any()).optional()
     }))
 });
+/** Execution status enum */
+export var ExecutionStatus;
+(function (ExecutionStatus) {
+    ExecutionStatus["PENDING"] = "pending";
+    ExecutionStatus["RUNNING"] = "running";
+    ExecutionStatus["COMPLETED"] = "completed";
+    ExecutionStatus["FAILED"] = "failed";
+    ExecutionStatus["CANCELLED"] = "cancelled";
+})(ExecutionStatus || (ExecutionStatus = {}));

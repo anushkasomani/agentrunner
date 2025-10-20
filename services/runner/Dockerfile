@@ -7,3 +7,4 @@ COPY tsconfig.json ./
 RUN npm run build || npx tsc -p tsconfig.json
 EXPOSE 7001
 CMD ["node","dist/server.js"]
+

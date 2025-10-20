@@ -1,20 +1,91 @@
 // Job queue implementation for execution management
+import { Queue, Worker } from 'bullmq';
 
-import Queue from 'bull';
-import { ExecutionPlan, ExecutionReceipt, ExecutionStatus } from '@agentrunner/common';
-import { SwapSkill } from '@agentrunner/skills';
-import { RebalanceSkill } from '@agentrunner/skills';
-import { ReceiptManager } from '@agentrunner/common';
-import { MerkleAnchoring } from '@agentrunner/common';
+// Define types locally for now
+export enum ExecutionStatus {
+  PENDING = 'pending',
+  RUNNING = 'running',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  CANCELLED = 'cancelled'
+}
+
+export type ExecutionPlan = {
+  id: string;
+  steps: ExecutionStep[];
+};
+
+export type ExecutionStep = {
+  id: string;
+  skillId: string;
+  inputs: Record<string, any>;
+};
+
+export type ExecutionReceipt = {
+  id: string;
+  planId: string;
+  stepId: string;
+  status: ExecutionStatus;
+  result?: any;
+  error?: string;
+  timestamp: number;
+};
+
+// Mock implementations for now
+class ReceiptManager {
+  createReceipt(planId: string, stepId: string): ExecutionReceipt {
+    return {
+      id: `${planId}-${stepId}-${Date.now()}`,
+      planId,
+      stepId,
+      status: ExecutionStatus.PENDING,
+      timestamp: Date.now()
+    };
+  }
+  
+  updateReceiptStatus(id: string, status: ExecutionStatus, result?: any, error?: string): void {
+    // Mock implementation
+  }
+  
+  getReceiptsByPlan(planId: string): ExecutionReceipt[] {
+    return [];
+  }
+}
+
+class MerkleAnchoring {
+  addReceiptToTree(planId: string, receiptData: string): void {
+    // Mock implementation
+  }
+}
+
+class SwapSkill {
+  async execute(inputs: any): Promise<any> {
+    // Mock implementation
+    return { success: true };
+  }
+}
+
+class RebalanceSkill {
+  async execute(inputs: any): Promise<any> {
+    // Mock implementation
+    return { success: true };
+  }
+}
 
 export class JobQueue {
-  private executionQueue: Queue.Queue;
+  private executionQueue: Queue;
+  private executionWorker!: Worker;
   private receiptManager: ReceiptManager;
   private merkleAnchoring: MerkleAnchoring;
   private skills: Map<string, any> = new Map();
 
   constructor() {
-    this.executionQueue = new Queue('execution', process.env.REDIS_URL || 'redis://localhost:6379');
+    this.executionQueue = new Queue('execution', {
+      connection: {
+        host: 'localhost',
+        port: 6379
+      }
+    });
     this.receiptManager = new ReceiptManager();
     this.merkleAnchoring = new MerkleAnchoring();
     
@@ -22,12 +93,12 @@ export class JobQueue {
     this.skills.set('swap', new SwapSkill());
     this.skills.set('rebalance', new RebalanceSkill());
     
-    this.setupProcessors();
+    this.setupWorkers();
   }
 
-  private setupProcessors(): void {
-    // Process execution plans
-    this.executionQueue.process('execute-plan', async (job) => {
+  private setupWorkers(): void {
+    // Create worker for execution plans
+    this.executionWorker = new Worker('execution', async (job) => {
       const plan: ExecutionPlan = job.data;
       console.log(`Processing execution plan: ${plan.id}`);
       
@@ -42,12 +113,11 @@ export class JobQueue {
         console.error(`Execution plan ${plan.id} failed:`, error);
         throw error;
       }
-    });
-
-    // Process individual steps
-    this.executionQueue.process('execute-step', async (job) => {
-      const { planId, step } = job.data;
-      await this.executeStep(planId, step);
+    }, {
+      connection: {
+        host: 'localhost',
+        port: 6379
+      }
     });
   }
 
@@ -111,7 +181,7 @@ export class JobQueue {
       },
     });
     
-    return job.id.toString();
+    return job.id!;
   }
 
   async getExecutionStatus(planId: string): Promise<{
@@ -124,11 +194,11 @@ export class JobQueue {
     let overallStatus = 'pending';
     if (receipts.length === 0) {
       overallStatus = 'pending';
-    } else if (receipts.every(r => r.status === ExecutionStatus.COMPLETED)) {
+    } else if (receipts.every((r: ExecutionReceipt) => r.status === ExecutionStatus.COMPLETED)) {
       overallStatus = 'completed';
-    } else if (receipts.some(r => r.status === ExecutionStatus.FAILED)) {
+    } else if (receipts.some((r: ExecutionReceipt) => r.status === ExecutionStatus.FAILED)) {
       overallStatus = 'failed';
-    } else if (receipts.some(r => r.status === ExecutionStatus.RUNNING)) {
+    } else if (receipts.some((r: ExecutionReceipt) => r.status === ExecutionStatus.RUNNING)) {
       overallStatus = 'running';
     }
     

@@ -54,3 +54,36 @@ export type Offer = {
   terms?: Record<string, any>;
   proofs?: Record<string, any>;
 };
+
+/** Execution status enum */
+export enum ExecutionStatus {
+  PENDING = 'pending',
+  RUNNING = 'running',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  CANCELLED = 'cancelled'
+}
+
+/** Execution plan for job queue */
+export type ExecutionPlan = {
+  id: string;
+  steps: ExecutionStep[];
+};
+
+/** Individual execution step */
+export type ExecutionStep = {
+  id: string;
+  skillId: string;
+  inputs: Record<string, any>;
+};
+
+/** Execution receipt for tracking */
+export type ExecutionReceipt = {
+  id: string;
+  planId: string;
+  stepId: string;
+  status: ExecutionStatus;
+  result?: any;
+  error?: string;
+  timestamp: number;
+};

@@ -1,5 +1,5 @@
-import { swap } from "./swap.js";
-import { GuardConfig } from "@agentrunner/common/types.js";
+import { swap } from "./swap";
+import { GuardConfig } from "@agentrunner/common/types";
 
 /** Multi-leg rebalance using swap() legs; in a real impl, consider Jito bundles. */
 export async function rebalance(params: {

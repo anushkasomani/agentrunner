@@ -1,2 +1,2 @@
-export * from "./swap.js";
-export * from "./rebalance.js";
+export * from "./swap";
+export * from "./rebalance";
