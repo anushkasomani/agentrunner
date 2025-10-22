@@ -26,7 +26,7 @@ export async function evaluateSwapGuards(params: {
   // 1) Pyth Hermes reference price + freshness
   const qs = params.pythPriceIds.map(id => `ids[]=${encodeURIComponent(id)}`).join("&");
   const hermesRes = await fetch(`${HERMES}/api/latest_price_feeds?${qs}`);
-  const prices = await hermesRes.json();
+  const prices: any[] = await hermesRes.json() as any;
   const now = Math.floor(Date.now() / 1000);
   const publishTimes: number[] = prices.map((p: any)=> p.price?.publish_time ?? p.publish_time);
   const freshest = Math.max(...publishTimes);
@@ -40,7 +40,7 @@ export async function evaluateSwapGuards(params: {
 
   // 2) Jupiter quote
   const url = `${JUP}/swap/v1/quote?inputMint=${params.inMint}&outputMint=${params.outMint}&amount=${params.amount}&slippageBps=${slippageBps}`;
-  const quote = await (await fetch(url)).json();
+  const quote: any = await (await fetch(url)).json();
   const quoteHash = crypto.createHash("sha256").update(JSON.stringify(quote)).digest("hex");
 
   // Effective execution price = in_amount / out_amount (approx)

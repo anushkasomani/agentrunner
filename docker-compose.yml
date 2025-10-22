@@ -92,7 +92,6 @@
 
 
 
-version: "3.9"
 services:
   postgres:
     image: postgres:15
@@ -122,7 +121,9 @@ services:
     ports: ["7003:7003"]
 
   broker:
-    build: ./services/broker
+    build:
+       context: .
+       dockerfile: services/broker/Dockerfile
     env_file: .env
     depends_on: [postgres]
     ports: ["7004:7004"]
@@ -144,3 +145,29 @@ services:
     env_file: .env
     depends_on: [api]
     ports: ["3000:3000"]
+  vendor1:
+    build: ./services/vendor-sim
+    environment:
+      VENDOR_NAME: "FastRoute"
+      CAPABILITY: "swap.spl"
+      PRICE_USD: "0.14"
+      RELIABILITY: "0.96"
+    ports: ["7101:7100"]
+
+  vendor2:
+    build: ./services/vendor-sim
+    environment:
+      VENDOR_NAME: "CheapSwap"
+      CAPABILITY: "swap.spl"
+      PRICE_USD: "0.09"
+      RELIABILITY: "0.88"
+    ports: ["7102:7100"]
+
+  vendor3:
+    build: ./services/vendor-sim
+    environment:
+      VENDOR_NAME: "BalancedX"
+      CAPABILITY: "swap.spl"
+      PRICE_USD: "0.11"
+      RELIABILITY: "0.93"
+    ports: ["7103:7100"]

@@ -1,22 +1,23 @@
-FROM node:18-alpine
-
+FROM node:20-alpine
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
-COPY tsconfig.json ./
+# 1) Bring in root + workspace package.jsons so npm knows about workspaces
+COPY package.json tsconfig.base.json ./
+COPY packages/common/package.json packages/common/tsconfig.json ./packages/common/
+COPY services/broker/package.json services/broker/tsconfig.json ./services/broker/
 
-# Install dependencies
-RUN npm ci --only=production
+# 2) Install workspace deps (creates node_modules/@agentrunner/common symlink)
+RUN npm install
 
-# Copy source code
-COPY src/ ./src/
+# 3) TS type deps so tsc is happy
+RUN npm install -D typescript @types/node @types/express @types/uuid @types/pg
 
-# Build the application
-RUN npm run build
+# 4) Now copy the rest of the sources
+COPY . .
 
-# Expose port
-EXPOSE 3001
+# 5) Build common first, then broker (so subpath exports point to dist files)
+RUN npx tsc -p packages/common/tsconfig.json \
+ && npx tsc -p services/broker/tsconfig.json
 
-# Start the application
-CMD ["npm", "start"]
+EXPOSE 7004
+CMD ["node","services/broker/dist/server.js"]
