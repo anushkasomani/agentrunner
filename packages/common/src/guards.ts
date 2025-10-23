@@ -2,8 +2,12 @@ import crypto from "node:crypto";
 import fetch from "node-fetch";
 import { GuardConfig } from "./types.js";
 
-const HERMES ="https://hermes.pyth.network"
-const JUP ="https://lite-api.jup.ag";
+const HERMES = process.env.PYTH_HERMES_BASE || "https://hermes.pyth.network";
+const JUP = process.env.JUPITER_BASE || "https://lite-api.jup.ag";
+// Raydium API URLs for devnet
+const RAYDIUM_BASE_HOST = "https://api-v3-devnet.raydium.io";
+const RAYDIUM_SWAP_HOST = "https://transaction-v1-devnet.raydium.io";
+const RAYDIUM_PRIORITY_FEE = "/main/auto-fee";
 
 export type GuardVerdict = {
   freshness_s: number;
@@ -56,30 +60,52 @@ export async function evaluateSwapGuards(params: {
     }
   }
 
-  // 2) Jupiter quote
+  // 2) Raydium quote (for devnet DUSDC support)
   let quote: any;
   let quoteHash = '';
   try {
-    const url = `${JUP}/swap/v1/quote?inputMint=${params.inMint}&outputMint=${params.outMint}&amount=${params.amount}&slippageBps=${slippageBps}`;
-    const quoteRes = await fetch(url);
+    const quoteUrl = `${RAYDIUM_SWAP_HOST}/compute/swap-base-in?inputMint=${params.inMint}&outputMint=${params.outMint}&amount=${params.amount}&slippageBps=${slippageBps}&txVersion=V0`;
+    const quoteRes = await fetch(quoteUrl);
     
     if (!quoteRes.ok) {
-      console.error(`Jupiter API error: ${quoteRes.status} ${quoteRes.statusText}`);
+      console.error(`Raydium API error: ${quoteRes.status} ${quoteRes.statusText}`);
       const errorText = await quoteRes.text();
-      console.error('Jupiter API error response:', errorText);
-      throw new Error(`Jupiter API returned ${quoteRes.status}: ${errorText}`);
+      console.error('Raydium API error response:', errorText);
+      throw new Error(`Raydium API returned ${quoteRes.status}: ${errorText}`);
     }
     
     quote = await quoteRes.json() as any;
     quoteHash = crypto.createHash("sha256").update(JSON.stringify(quote)).digest("hex");
   } catch (error) {
-    console.error('Jupiter quote failed:', error);
-    throw new Error(`Jupiter quote failed: ${error instanceof Error ? error.message : String(error)}`);
+    console.error('Raydium quote failed:', error);
+    throw new Error(`Raydium quote failed: ${error instanceof Error ? error.message : String(error)}`);
   }
+
+  // COMMENTED OUT: Jupiter quote (for mainnet tokens)
+  // let quote: any;
+  // let quoteHash = '';
+  // try {
+  //   const url = `${JUP}/swap/v1/quote?inputMint=${params.inMint}&outputMint=${params.outMint}&amount=${params.amount}&slippageBps=${slippageBps}`;
+  //   const quoteRes = await fetch(url);
+  //   
+  //   if (!quoteRes.ok) {
+  //     console.error(`Jupiter API error: ${quoteRes.status} ${quoteRes.statusText}`);
+  //     const errorText = await quoteRes.text();
+  //     console.error('Jupiter API error response:', errorText);
+  //     throw new Error(`Jupiter API returned ${quoteRes.status}: ${errorText}`);
+  //   }
+  //   
+  //   quote = await quoteRes.json() as any;
+  //   quoteHash = crypto.createHash("sha256").update(JSON.stringify(quote)).digest("hex");
+  // } catch (error) {
+  //   console.error('Jupiter quote failed:', error);
+  //   throw new Error(`Jupiter quote failed: ${error instanceof Error ? error.message : String(error)}`);
+  // }
 
   // Effective execution price = in_amount / out_amount (approx)
   const inAmount = Number(params.amount);
-  const outAmount = Number(quote?.outAmount ?? 0);
+  // Raydium response format: quote.data.default.vh (estimated output amount)
+  const outAmount = Number(quote?.data?.default?.vh ?? quote?.outAmount ?? 0);
   const execPrice = outAmount > 0 ? inAmount / outAmount : Number.POSITIVE_INFINITY;
   const priceDeviation = Math.abs(execPrice - refPrice) / (refPrice || 1);
 

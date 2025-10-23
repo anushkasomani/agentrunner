@@ -6,7 +6,7 @@ import { signReceipt } from "@agentrunner/common/receipts";
 import { buildDailyMerkle } from "@agentrunner/common/merkle";
 import { swap, rebalance } from "@agentrunner/skills";
 import { dlPostReceipt } from "@agentrunner/common/datalayer";
-import { owner } from "./raydium-config.js";
+import { owner } from "./raydium-config.ts";
 
 const RUNNER_PUBKEY="HNMhpZQuQ3aJ1ePix4Q8afwUxDFmGNC4ReknNgFmNbq3"
 const app = express();

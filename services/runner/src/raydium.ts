@@ -1,7 +1,7 @@
 import { Transaction, VersionedTransaction, sendAndConfirmTransaction, PublicKey } from '@solana/web3.js'
 import { NATIVE_MINT } from '@solana/spl-token'
 import axios from 'axios'
-import { connection, owner, initSdk, API_URLS } from './raydium-config'
+import { connection, owner, initSdk, API_URLS } from './raydium-config.ts'
 
 interface SwapCompute {
   id: string

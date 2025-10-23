@@ -22,7 +22,7 @@ export async function swap(params: {
     // Convert amount to number (assuming it's already in the correct decimal format)
     const amountNumber = parseFloat(params.amount);
     // Import Raydium swap function dynamically to avoid circular dependencies
-    const raydiumModulePath = "../../../../services/runner/src/raydium.js";
+    const raydiumModulePath = "../../../services/runner/src/raydium.ts";
     const { raydiumSwap } = await import(raydiumModulePath);
     
     // Execute Raydium swap
