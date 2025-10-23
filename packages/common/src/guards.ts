@@ -2,8 +2,8 @@ import crypto from "node:crypto";
 import fetch from "node-fetch";
 import { GuardConfig } from "./types.js";
 
-const HERMES = process.env.PYTH_HERMES_BASE!;
-const JUP = process.env.JUPITER_BASE!;
+const HERMES ="https://hermes.pyth.network"
+const JUP ="https://lite-api.jup.ag";
 
 export type GuardVerdict = {
   freshness_s: number;
@@ -23,25 +23,59 @@ export async function evaluateSwapGuards(params: {
 }): Promise<GuardVerdict> {
   const { slippageBps, guard } = params;
 
-  // 1) Pyth Hermes reference price + freshness
-  const qs = params.pythPriceIds.map(id => `ids[]=${encodeURIComponent(id)}`).join("&");
-  const hermesRes = await fetch(`${HERMES}/api/latest_price_feeds?${qs}`);
-  const prices = await hermesRes.json() as any[];
-  const now = Math.floor(Date.now() / 1000);
-  const publishTimes: number[] = prices.map((p: any)=> p.price?.publish_time ?? p.publish_time);
-  const freshest = Math.max(...publishTimes);
-  const freshness = now - freshest;
-  if (freshness > guard.freshness_s) {
-    return { freshness_s: freshness, slippage_bps: slippageBps, notional_usd: 0, price_deviation: 1, tx_fee_sol: 0, verdict: "FAIL" };
+  let refPrice = 1; // Default reference price
+  let freshness = 0; // Default freshness
+  let freshest = Math.floor(Date.now() / 1000);
+
+  // 1) Pyth Hermes reference price + freshness (only if price IDs provided)
+  if (params.pythPriceIds.length > 0) {
+    try {
+      const qs = params.pythPriceIds.map(id => `ids[]=${encodeURIComponent(id)}`).join("&");
+      const hermesRes = await fetch(`${HERMES}/api/latest_price_feeds?${qs}`);
+      
+      if (!hermesRes.ok) {
+        console.warn(`Pyth API error: ${hermesRes.status} ${hermesRes.statusText}`);
+        throw new Error(`Pyth API returned ${hermesRes.status}`);
+      }
+      
+      const prices = await hermesRes.json() as any[];
+      const now = Math.floor(Date.now() / 1000);
+      const publishTimes: number[] = prices.map((p: any)=> p.price?.publish_time ?? p.publish_time);
+      freshest = Math.max(...publishTimes);
+      freshness = now - freshest;
+      
+      if (freshness > guard.freshness_s) {
+        return { freshness_s: freshness, slippage_bps: slippageBps, notional_usd: 0, price_deviation: 1, tx_fee_sol: 0, verdict: "FAIL" };
+      }
+
+      // crude refPrice as avg of first feed price
+      refPrice = Number(prices[0]?.price?.price ?? prices[0]?.price) * Math.pow(10, Number(prices[0]?.price?.expo ?? 0));
+    } catch (error) {
+      console.warn('Pyth price fetch failed, using default values:', error);
+      // Continue with default values
+    }
   }
 
-  // crude refPrice as avg of first feed price
-  const refPrice = Number(prices[0]?.price?.price ?? prices[0]?.price) * Math.pow(10, Number(prices[0]?.price?.expo ?? 0));
-
   // 2) Jupiter quote
-  const url = `${JUP}/swap/v1/quote?inputMint=${params.inMint}&outputMint=${params.outMint}&amount=${params.amount}&slippageBps=${slippageBps}`;
-  const quote = await (await fetch(url)).json() as any;
-  const quoteHash = crypto.createHash("sha256").update(JSON.stringify(quote)).digest("hex");
+  let quote: any;
+  let quoteHash = '';
+  try {
+    const url = `${JUP}/swap/v1/quote?inputMint=${params.inMint}&outputMint=${params.outMint}&amount=${params.amount}&slippageBps=${slippageBps}`;
+    const quoteRes = await fetch(url);
+    
+    if (!quoteRes.ok) {
+      console.error(`Jupiter API error: ${quoteRes.status} ${quoteRes.statusText}`);
+      const errorText = await quoteRes.text();
+      console.error('Jupiter API error response:', errorText);
+      throw new Error(`Jupiter API returned ${quoteRes.status}: ${errorText}`);
+    }
+    
+    quote = await quoteRes.json() as any;
+    quoteHash = crypto.createHash("sha256").update(JSON.stringify(quote)).digest("hex");
+  } catch (error) {
+    console.error('Jupiter quote failed:', error);
+    throw new Error(`Jupiter quote failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
 
   // Effective execution price = in_amount / out_amount (approx)
   const inAmount = Number(params.amount);

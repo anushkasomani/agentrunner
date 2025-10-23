@@ -3,11 +3,18 @@
   "include": ["src/**/*"],
   "compilerOptions": {
     "baseUrl": ".",
+    "moduleResolution": "node",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
     "paths": {
       "@agentrunner/common": ["../../packages/common/src"],
       "@agentrunner/common/*": ["../../packages/common/src/*"],
       "@agentrunner/skills": ["../../packages/skills/src"],
       "@agentrunner/skills/*": ["../../packages/skills/src/*"]
     }
+  },
+  "ts-node": {
+    "esm": true,
+    "experimentalSpecifierResolution": "node"
   }
 }

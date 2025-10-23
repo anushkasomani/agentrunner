@@ -6,7 +6,9 @@ import { signReceipt } from "@agentrunner/common/receipts";
 import { buildDailyMerkle } from "@agentrunner/common/merkle";
 import { swap, rebalance } from "@agentrunner/skills";
 import { dlPostReceipt } from "@agentrunner/common/datalayer";
+import { owner } from "./raydium-config.js";
 
+const RUNNER_PUBKEY="HNMhpZQuQ3aJ1ePix4Q8afwUxDFmGNC4ReknNgFmNbq3"
 const app = express();
 app.use(express.json({ limit: "1mb" }));
 
@@ -17,19 +19,21 @@ app.post("/run/skill/swap", async (req, res) => {
   try {
     const body = req.body;
     const guard = GuardConfigSchema.parse(body.guard || {});
+    console.log("swapping")
     const out = await swap({
       inMint: body.inMint, outMint: body.outMint, amount: body.amount, slippageBps: body.slippageBps,
       pythPriceIds: body.pythPriceIds, guard
     });
+    console.log("swapp successfull. output is : ", out)
 
     const receipt: Receipt = {
-      runner_pubkey: process.env.RUNNER_PUBKEY || "51j3b8cZkYwAeKA47rEGWs8vLm12RD82yAgHhYYhyimr",
+      runner_pubkey: RUNNER_PUBKEY || "HNMhpZQuQ3aJ1ePix4Q8afwUxDFmGNC4ReknNgFmNbq3",
       agent: "swap",
       task_id: uuid(),
       when_unix: Math.floor(Date.now()/1000),
       inputs: body,
       outputs: { txid: out.txid, outAmount: out.outAmount },
-      protocols: ["jupiter","pyth"],
+      protocols: ["raydium","pyth"],
       fees: { lamports: 5000 },
       cost_usd: "0.01",
       guards: {
@@ -47,7 +51,10 @@ app.post("/run/skill/swap", async (req, res) => {
       }
     };
 
-    const priv = Uint8Array.from(JSON.parse(process.env.FEE_PAYER_SECRET_KEY!));
+    const priv = owner.secretKey.slice(0, 32); // Extract only the private key part (first 32 bytes)
+    console.log('Secret key length:', priv.length);
+    console.log('Secret key type:', typeof priv);
+    console.log('Secret key constructor:', priv.constructor.name);
     const signed = await signReceipt(receipt, priv);
     RECEIPTS.push(JSON.stringify(signed));
 
@@ -68,20 +75,20 @@ app.post("/run/skill/rebalance", async (req, res) => {
     const results = await rebalance({ legs: body.legs, guard });
 
     const receipt: Receipt = {
-      runner_pubkey: process.env.RUNNER_PUBKEY!,
+      runner_pubkey: RUNNER_PUBKEY,
       agent: "rebalance",
       task_id: uuid(),
       when_unix: Math.floor(Date.now()/1000),
       inputs: body,
       outputs: { legs: results },
-      protocols: ["jupiter","pyth"],
+      protocols: ["raydium","pyth"],
       fees: { lamports: 15000 },
       cost_usd: "0.03",
       guards: { freshness_s: 3, slippage_bps: 30, notional_usd: 0, price_deviation: 0.004, tx_fee_sol: 0.000015, verdict: "OK" },
       refs: { config_hash: "sha256:guardcfg" }
     };
 
-    const priv = Uint8Array.from(JSON.parse(process.env.FEE_PAYER_SECRET_KEY!));
+    const priv = owner.secretKey.slice(0, 32); // Extract only the private key part (first 32 bytes)
     const signed = await signReceipt(receipt, priv);
     RECEIPTS.push(JSON.stringify(signed));
     try { if (process.env.DATA_LAYER_URL) await dlPostReceipt(signed); } catch {}
