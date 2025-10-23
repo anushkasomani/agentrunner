@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import fetch from "node-fetch";
-const HERMES = process.env.PYTH_HERMES_BASE;
-const JUP = process.env.JUPITER_BASE;
+const HERMES = "https://hermes.pyth.network"
+const JUP ="https://lite-api.jup.ag"
 export async function evaluateSwapGuards(params) {
     const { slippageBps, guard } = params;
     // 1) Pyth Hermes reference price + freshness
