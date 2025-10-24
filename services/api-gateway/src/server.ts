@@ -1,194 +1,159 @@
-// API Gateway service
+import express from "express";
+import cors from "cors";
+import fetch from "node-fetch";
+import * as anchor from "@coral-xyz/anchor";
+import { Connection, PublicKey } from "@solana/web3.js";
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import dotenv from 'dotenv';
-import { createProxyMiddleware } from 'http-proxy-middleware';
-import rateLimit from 'express-rate-limit';
-
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const idl = JSON.parse(readFileSync(join(__dirname, 'registry.json'), 'utf8'));
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
-});
-
-// Middleware
-app.use(helmet());
 app.use(cors());
-app.use(morgan('combined'));
-app.use(express.json());
-app.use(limiter);
+app.use(express.json({ limit: "1mb" }));
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'healthy', 
-    timestamp: new Date().toISOString(),
-    service: 'api-gateway',
-    services: {
-      runner: process.env.RUNNER_URL || 'http://localhost:3001',
-      planner: process.env.PLANNER_URL || 'http://localhost:3002',
-      merchant: process.env.X402_MERCHANT_URL || 'http://localhost:3003',
-      broker: process.env.BROKER_URL || 'http://localhost:3004',
-      certifier: process.env.CERTIFIER_URL || 'http://localhost:3005'
-    }
-  });
+const RUNNER = "http://localhost:7001";
+const PLANNER = "http://localhost:7002";
+const X402 =  "http://localhost:7003";
+const BROKER =  "http://localhost:7004";
+const CERT =  "http://localhost:7005";
+
+// --- On-chain (read) client setup
+const RPC = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
+const connection = new Connection(RPC, "confirmed");
+const PROGRAM_ID = process.env.AGENT_PROGRAM_ID ? new PublicKey(process.env.AGENT_PROGRAM_ID) : null;
+const AGENT_IDENTITY = process.env.AGENT_IDENTITY ? new PublicKey(process.env.AGENT_IDENTITY) : null;
+
+// Anchor Program instance (read-only provider)
+let program: anchor.Program | null = null;
+if (PROGRAM_ID) {
+  // Use a dummy read-only provider
+  const provider = new anchor.AnchorProvider(connection, {} as any, { commitment: "confirmed" });
+  program = new anchor.Program(idl as any, PROGRAM_ID, provider);
+}
+
+/** Health */
+app.get("/health", (_req,res)=> res.json({ ok:true, name:"api-gateway" }));
+
+/** Planner */
+app.post("/plan", async (req, res) => {
+  const r = await fetch(`${PLANNER}/plan`, { method:"POST", headers:{ "content-type":"application/json" }, body: JSON.stringify(req.body || {}) });
+  res.status(r.status).set(Object.fromEntries(r.headers)).send(await r.text());
 });
 
-// Service discovery endpoint
-app.get('/services', (req, res) => {
+/** x402 proxy */
+app.get("/price", async (req, res) => {
+  const url = new URL(`${X402}/price`);
+  if (req.query.capability) url.searchParams.set("capability", String(req.query.capability));
+  const r = await fetch(url.toString());
+  res.status(r.status).set(Object.fromEntries(r.headers)).send(await r.text());
+});
+
+app.post("/invoice", async (req,res)=>{
+  const r = await fetch(`${X402}/invoice`, { method:"POST", headers:{ "content-type":"application/json" }, body: JSON.stringify(req.body || {}) });
+  res.status(r.status).set(Object.fromEntries(r.headers)).send(await r.text());
+});
+
+app.post("/verify", async (req,res)=>{
+  const r = await fetch(`${X402}/verify`, { method:"POST", headers:{ "content-type":"application/json" }, body: JSON.stringify(req.body || {}) });
+  res.status(r.status).set(Object.fromEntries(r.headers)).send(await r.text());
+});
+
+app.post("/refund", async (req,res)=>{
+  const r = await fetch(`${X402}/refund`, { method:"POST", headers:{ "content-type":"application/json" }, body: JSON.stringify(req.body || {}) });
+  res.status(r.status).set(Object.fromEntries(r.headers)).send(await r.text());
+});
+
+/** Broker: RFP + Offers + Hire */
+app.post("/rfp", async (req,res)=>{
+  const r = await fetch(`${BROKER}/rfp`, { method:"POST", headers:{ "content-type":"application/json" }, body: JSON.stringify(req.body || {}) });
+  res.status(r.status).set(Object.fromEntries(r.headers)).send(await r.text());
+});
+app.get("/rfp/:id/offers", async (req,res)=>{
+  const r = await fetch(`${BROKER}/rfp/${req.params.id}/offers`);
+  res.status(r.status).set(Object.fromEntries(r.headers)).send(await r.text());
+});
+app.post("/hire", async (req,res)=>{
+  const r = await fetch(`${BROKER}/hire`, { method:"POST", headers:{ "content-type":"application/json" }, body: JSON.stringify(req.body || {}) });
+  res.status(r.status).set(Object.fromEntries(r.headers)).send(await r.text());
+});
+
+/** Certifier */
+app.post("/submit", async (req,res)=>{
+  const r = await fetch(`${CERT}/submit`, { method:"POST", headers:{ "content-type":"application/json" }, body: JSON.stringify(req.body || {}) });
+  res.status(r.status).set(Object.fromEntries(r.headers)).send(await r.text());
+});
+app.get("/cert/:id", async (req,res)=>{
+  const r = await fetch(`${CERT}/cert/${req.params.id}`);
+  res.status(r.status).set(Object.fromEntries(r.headers)).send(await r.text());
+});
+
+/** Runner: paid run (requires invoice+proof or a prior verify) */
+app.post("/run/swap", async (req,res)=>{
+  const { invoice, proof, ...rest } = req.body || {};
+  if (invoice && proof) {
+    const v = await fetch(`${X402}/verify`, { method:"POST", headers:{ "content-type":"application/json" }, body: JSON.stringify({ invoice, proof }) });
+    if (!v.ok) {
+      const bodyText = await v.text();
+      return res.status(402).set({ "X-402-Invoice": invoice }).send(bodyText);
+    }
+  } else {
+    const price = await fetch(`${X402}/invoice`, { method:"POST", headers:{ "content-type":"application/json" }, body: JSON.stringify({ price_usd: 0.10 }) });
+    const headers:any = Object.fromEntries(price.headers);
+    const bodyText = await price.text();
+    return res.status(402).set(headers).send(bodyText);
+  }
+  const r = await fetch(`${RUNNER}/run/skill/swap`, { method:"POST", headers:{ "content-type":"application/json" }, body: JSON.stringify(rest) });
+  res.status(r.status).set(Object.fromEntries(r.headers)).send(await r.text());
+});
+
+/** Receipts + Anchor passthroughs */
+app.get("/receipts", async (_req,res)=>{
+  const r = await fetch(`${RUNNER}/receipts`);
+  res.status(r.status).set(Object.fromEntries(r.headers)).send(await r.text());
+});
+app.post("/anchor/daily", async (_req,res)=>{
+  const r = await fetch(`${RUNNER}/anchor/daily`, { method:"POST" });
+  res.status(r.status).set(Object.fromEntries(r.headers)).send(await r.text());
+});
+
+/** Catalog (demo) */
+app.get("/catalog", async (_req,res)=>{
+  res.json({ ok:true, agents:[{ id:"local-swap-vendor", name:"Local Swap Vendor", capability:"swap.spl", price_endpoint:"/price?capability=swap.spl" }]});
+});
+
+/** NEW: On-chain endpoints (3) */
+// 1) Program/identity info for the UI
+app.get("/onchain/info", (_req, res) => {
   res.json({
-    services: {
-      runner: {
-        url: process.env.RUNNER_URL || 'http://localhost:3001',
-        description: 'Agent execution runner service',
-        endpoints: ['/execute', '/status', '/receipts', '/merkle']
-      },
-      planner: {
-        url: process.env.PLANNER_URL || 'http://localhost:3002',
-        description: 'OpenAI-based planning service',
-        endpoints: ['/plan', '/validate']
-      },
-      merchant: {
-        url: process.env.X402_MERCHANT_URL || 'http://localhost:3003',
-        description: '402 payment challenge service',
-        endpoints: ['/challenge', '/verify', '/refund']
-      },
-      broker: {
-        url: process.env.BROKER_URL || 'http://localhost:3004',
-        description: 'RFP broker service',
-        endpoints: ['/rfp', '/offer']
-      },
-      certifier: {
-        url: process.env.CERTIFIER_URL || 'http://localhost:3005',
-        description: 'Agent certification service',
-        endpoints: ['/certify', '/certification']
-      }
-    }
+    ok: true,
+    program_id: PROGRAM_ID?.toBase58() || null,
+    agent_identity: AGENT_IDENTITY?.toBase58() || null,
+    rpc: RPC,
+    has_anchor: !!program
   });
 });
 
-// Proxy to Runner service
-app.use('/api/runner', createProxyMiddleware({
-  target: process.env.RUNNER_URL || 'http://localhost:3001',
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api/runner': ''
-  },
-  onError: (err, req, res) => {
-    console.error('Runner service error:', err);
-    res.status(503).json({ error: 'Runner service unavailable' });
-  }
-}));
+// 2) Relay daily anchor (calls runner, which builds root and posts on-chain)
+app.post("/onchain/anchor/daily", async (_req, res) => {
+  const r = await fetch(`${RUNNER}/anchor/daily`, { method: "POST" });
+  res.status(r.status).set(Object.fromEntries(r.headers)).send(await r.text());
+});
 
-// Proxy to Planner service
-app.use('/api/planner', createProxyMiddleware({
-  target: process.env.PLANNER_URL || 'http://localhost:3002',
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api/planner': ''
-  },
-  onError: (err, req, res) => {
-    console.error('Planner service error:', err);
-    res.status(503).json({ error: 'Planner service unavailable' });
-  }
-}));
-
-// Proxy to Merchant service
-app.use('/api/merchant', createProxyMiddleware({
-  target: process.env.X402_MERCHANT_URL || 'http://localhost:3003',
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api/merchant': ''
-  },
-  onError: (err, req, res) => {
-    console.error('Merchant service error:', err);
-    res.status(503).json({ error: 'Merchant service unavailable' });
-  }
-}));
-
-// Proxy to Broker service
-app.use('/api/broker', createProxyMiddleware({
-  target: process.env.BROKER_URL || 'http://localhost:3004',
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api/broker': ''
-  },
-  onError: (err, req, res) => {
-    console.error('Broker service error:', err);
-    res.status(503).json({ error: 'Broker service unavailable' });
-  }
-}));
-
-// Proxy to Certifier service
-app.use('/api/certifier', createProxyMiddleware({
-  target: process.env.CERTIFIER_URL || 'http://localhost:3005',
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api/certifier': ''
-  },
-  onError: (err, req, res) => {
-    console.error('Certifier service error:', err);
-    res.status(503).json({ error: 'Certifier service unavailable' });
-  }
-}));
-
-// Unified API endpoints
-app.post('/api/execute', async (req, res) => {
+// 3) Fetch a transaction by signature (debug/readout)
+app.get("/onchain/tx/:sig", async (req, res) => {
   try {
-    const response = await fetch(`${process.env.RUNNER_URL || 'http://localhost:3001'}/execute`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body)
-    });
-    
-    const data = await response.json();
-    res.json(data);
-  } catch (error) {
-    console.error('Error executing plan:', error);
-    res.status(500).json({ error: 'Failed to execute plan' });
+    const tx = await connection.getTransaction(req.params.sig, { maxSupportedTransactionVersion: 0, commitment: "confirmed" });
+    if (!tx) return res.status(404).json({ ok:false, error:"not found" });
+    res.json({ ok:true, tx });
+  } catch (e:any) {
+    res.status(400).json({ ok:false, error: e.message });
   }
 });
 
-app.post('/api/plan', async (req, res) => {
-  try {
-    const response = await fetch(`${process.env.PLANNER_URL || 'http://localhost:3002'}/plan`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body)
-    });
-    
-    const data = await response.json();
-    res.json(data);
-  } catch (error) {
-    console.error('Error generating plan:', error);
-    res.status(500).json({ error: 'Failed to generate plan' });
-  }
-});
-
-// Error handling
-app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Unhandled error:', error);
-  res.status(500).json({ error: 'Internal server error' });
-});
-
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({ error: 'Endpoint not found' });
-});
-
-app.listen(PORT, () => {
-  console.log(`API Gateway listening on port ${PORT}`);
-});
-
-export default app;
+app.listen(8080, ()=> console.log("API Gateway listening on :8080"));
 
 
