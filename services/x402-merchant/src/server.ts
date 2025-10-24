@@ -76,7 +76,9 @@ for (const pb of post) {
     if (delta > 0) received += delta;
   }
 }
-if (received + 1e-9 < Number(proof.amount)) throw new Error(`payment shortfall: ${received} < ${proof.amount}`);
+// Convert proof.amount from raw units to UI units (divide by 1,000,000 for 6 decimals)
+const expectedAmount = Number(proof.amount) / 1_000_000;
+if (received + 1e-9 < expectedAmount) throw new Error(`payment shortfall: ${received} < ${expectedAmount}`);
 
 inv.paid = true;
 return res.json({ ok:true, invoice, status:"verified" });

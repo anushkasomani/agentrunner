@@ -32,7 +32,7 @@ async function makePayment(invoice: string): Promise<any> {
     
     // Parse invoice to get amount
     const invoiceData = JSON.parse(invoice);
-    const amount = Math.min(invoiceData.price_usd, 0.001); // Cap at 0.001 for testing
+    const amount = 0.001; // Fixed amount for testing
     
     try {
         // Get payer's USDC token account
@@ -75,7 +75,7 @@ async function makePayment(invoice: string): Promise<any> {
             payerAta,
             receiverAta,
             PAYER.publicKey,
-            Math.floor(amount * 1_000_000) // Convert to 6 decimals
+            1000 // Exactly 1000 (0.001 USDC in 6 decimals)
         );
         
         // Create and send transaction
@@ -133,6 +133,24 @@ app.post('/run', async(req,res)=>{
         headers: { "content-type": "application/json" },
         body: JSON.stringify(req.body)
     });
+    
+    if (!runnerResp.ok) {
+        return res.status(runnerResp.status).send(await runnerResp.text());
+    }
+    
+    // 5. Call anchor/daily after successful runner execution
+    try {
+        const anchorResp = await fetch(`${RUNNER}/anchor/daily`, {
+            method: "POST",
+            headers: { "content-type": "application/json" }
+        });
+        
+        const anchorData = await anchorResp.json();
+        console.log("Anchor daily result:", anchorData);
+    } catch (anchorError) {
+        console.error("Anchor daily call failed:", anchorError);
+        // Continue execution even if anchor fails
+    }
     
     res.status(runnerResp.status).set(Object.fromEntries(runnerResp.headers)).send(await runnerResp.text());
 });

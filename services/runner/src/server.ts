@@ -7,6 +7,7 @@ import { buildDailyMerkle } from "@agentrunner/common/merkle";
 import { swap, rebalance } from "@agentrunner/skills";
 import { dlPostReceipt } from "@agentrunner/common/datalayer";
 import { owner } from "./raydium-config.ts";
+import { anchorMerkleRoot } from "./anchorMerkle.ts";
 
 const RUNNER_PUBKEY="HNMhpZQuQ3aJ1ePix4Q8afwUxDFmGNC4ReknNgFmNbq3"
 const app = express();
@@ -98,11 +99,27 @@ app.post("/run/skill/rebalance", async (req, res) => {
   }
 });
 
-// POST /anchor/daily  (build merkle root; chain submit wired later)
-app.post("/anchor/daily", async (_req, res) => {
-  const { root } = buildDailyMerkle(RECEIPTS);
-  return res.json({ ok:true, root, count: RECEIPTS.length });
+// GET /receipts - Get all receipts
+app.get("/receipts", (_req, res) => {
+  const parsedReceipts = RECEIPTS.map(receipt => JSON.parse(receipt));
+  return res.json({ ok: true, receipts: parsedReceipts, count: RECEIPTS.length });
 });
+
+// POST /anchor/daily  (build merkle root; chain submit wired later)
+// app.post("/anchor/daily", async (_req, res) => {
+//   const { root } = buildDailyMerkle(RECEIPTS);
+//   return res.json({ ok:true, root, count: RECEIPTS.length });
+// });
+
+app.post("/anchor/daily", async (_req, res) => {
+  try {
+    const { root } = buildDailyMerkle(RECEIPTS);
+    const { txid, date } = await anchorMerkleRoot(root);
+    return res.json({ ok:true, root, date, txid, count: RECEIPTS.length });
+  } catch (e:any) {
+    return res.status(400).json({ ok:false, error: e.message });
+  }
+})
 
 app.listen(7001, ()=> console.log("Runner listening on :7001"));
 
