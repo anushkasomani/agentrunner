@@ -10,7 +10,7 @@ export async function rebalance(params: {
   for (const leg of params.legs) {
     const res = await swap({ ...leg, guard: params.guard });
     results.push(res);
-    if (res.verdict.verdict !== "OK") break;
+    // if (res.verdict.verdict !== "OK") break;
   }
   return results;
 }

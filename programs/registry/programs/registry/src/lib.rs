@@ -1,9 +1,8 @@
 use anchor_lang::prelude::*;
-
-declare_id!("AGentReg1strY111111111111111111111111111111"); // REPLACE with your deployed AGENT_PROGRAM_ID
+declare_id!("HXGQvWagr4soQviA3Lr9LPzVw5G1EmstnaivhYE3BCHK"); 
 
 #[program]
-pub mod agent_registry {
+pub mod registry {
     use super::*;
 
     /// Create an Agent record bound to an identity pubkey, owned by `owner`.
@@ -14,7 +13,7 @@ pub mod agent_registry {
         agent.identity = identity;
         agent.owner = ctx.accounts.owner.key();
         agent.metadata_uri = metadata_uri;
-        agent.bump = *ctx.bumps.get("agent").unwrap();
+        agent.bump = ctx.bumps.agent;
         agent.created_at = Clock::get()?.unix_timestamp;
         Ok(())
     }
@@ -34,7 +33,7 @@ pub mod agent_registry {
         v.validator = ctx.accounts.validator.key();
         v.day_yyyymmdd = day_yyyymmdd;
         v.merkle_root = merkle_root;
-        v.bump = *ctx.bumps.get("validation").unwrap();
+        v.bump = ctx.bumps.validation;
         v.ts = Clock::get()?.unix_timestamp;
         Ok(())
     }
@@ -47,7 +46,7 @@ pub mod agent_registry {
         f.reviewer = ctx.accounts.reviewer.key();
         f.rating = rating;
         f.tag = tag;
-        f.bump = *ctx.bumps.get("feedback").unwrap();
+        f.bump = ctx.bumps.feedback;
         f.ts = Clock::get()?.unix_timestamp;
         Ok(())
     }
@@ -56,6 +55,7 @@ pub mod agent_registry {
 #[derive(Accounts)]
 #[instruction(identity: Pubkey)]
 pub struct RegisterAgent<'info> {
+    /// payer must be mutable when used with `init`
     #[account(mut)]
     pub owner: Signer<'info>,
 
@@ -73,7 +73,7 @@ pub struct RegisterAgent<'info> {
 
 #[derive(Accounts)]
 pub struct UpdateAgent<'info> {
-    #[account(mut)]
+    /// owner signs the update
     pub owner: Signer<'info>,
 
     #[account(mut)]
@@ -83,10 +83,11 @@ pub struct UpdateAgent<'info> {
 #[derive(Accounts)]
 #[instruction(day_yyyymmdd: u32)]
 pub struct PostValidation<'info> {
-    /// Validator posting the root (could be the runner or an external auditor)
+    /// Validator posting the root (payer) — must be mutable because Anchor will debit lamports.
+    #[account(mut)]
     pub validator: Signer<'info>,
 
-    /// Ensure the agent exists
+    /// Ensure the agent exists (no need to be mut if not modified)
     pub agent: Account<'info, Agent>,
 
     #[account(
@@ -103,14 +104,18 @@ pub struct PostValidation<'info> {
 
 #[derive(Accounts)]
 pub struct PostFeedback<'info> {
+    /// reviewer is the payer — must be mutable
+    #[account(mut)]
     pub reviewer: Signer<'info>,
+
+    /// Agent existence check
     pub agent: Account<'info, Agent>,
 
     #[account(
-        init_if_needed,
+        init,
         payer = reviewer,
         space = 8 + Feedback::SIZE,
-        seeds = [b"feedback", agent.identity.as_ref(), reviewer.key.as_ref()],
+        seeds = [b"feedback", agent.identity.as_ref(), reviewer.key().as_ref()],
         bump
     )]
     pub feedback: Account<'info, Feedback>,
