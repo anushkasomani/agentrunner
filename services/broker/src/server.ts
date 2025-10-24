@@ -2,7 +2,8 @@ import express from "express";
 import { v4 as uuid } from "uuid";
 import fetch from "node-fetch";
 import { z } from "zod";
-import { Client } from "pg";
+import pgPkg from "pg";
+const { Client } = pgPkg;
 import { dlBenchmarks } from "@agentrunner/common/datalayer";
 
 const app = express();
