@@ -9,7 +9,14 @@ app.use(express.json());
 
 const CURRENCY = process.env.X402_CURRENCY || "USDC";
 const PAYTO_MINT = new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"); // USDC mint (devnet/mainnet)
-const PAYTO_ADDRESS = new PublicKey("51j3b8cZkYwAeKA47rEGWs8vLm12RD82yAgHhYYhyimr"); // merchant USDC token account
+// Derive the correct ATA for merchant
+const MERCHANT_PUBKEY = new PublicKey("51j3b8cZkYwAeKA47rEGWs8vLm12RD82yAgHhYYhyimr");
+let PAYTO_ADDRESS: PublicKey;
+
+// Initialize PAYTO_ADDRESS after connection is established
+(async () => {
+    PAYTO_ADDRESS = await getAssociatedTokenAddress(PAYTO_MINT, MERCHANT_PUBKEY, false);
+})();
 const RPC = process.env.SOLANA_RPC_URL! || "https://wild-late-season.solana-devnet.quiknode.pro/b0ebcc50a76d22c777b9f18945f0d47e9f71ccaf";
 const conn = new Connection(RPC, "confirmed");
 
@@ -69,7 +76,9 @@ for (const pb of post) {
     if (delta > 0) received += delta;
   }
 }
-if (received + 1e-9 < Number(proof.amount)) throw new Error(`payment shortfall: ${received} < ${proof.amount}`);
+// Convert proof.amount from raw units to UI units (divide by 1,000,000 for 6 decimals)
+const expectedAmount = Number(proof.amount) / 1_000_000;
+if (received + 1e-9 < expectedAmount) throw new Error(`payment shortfall: ${received} < ${expectedAmount}`);
 
 inv.paid = true;
 return res.json({ ok:true, invoice, status:"verified" });
