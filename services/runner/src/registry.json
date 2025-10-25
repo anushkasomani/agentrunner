@@ -220,7 +220,7 @@
         "args": [
           {
             "name": "identity",
-            "type": "pubkey"
+            "type": "publicKey"
           },
           {
             "name": "metadata_uri",
@@ -265,21 +265,75 @@
       }
     ],
     "accounts": [
-      {
-        "name": "Agent",
-        "discriminator": [
-          47,
-          166,
-          112,
-          147,
-          155,
-          197,
-          86,
-          7
+    {
+      "name": "Agent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity",
+            "type": "publicKey"
+          },
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "metadata_uri",
+            "type": "string"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
         ]
       },
+      "discriminator": [
+        47,
+        166,
+        112,
+        147,
+        155,
+        197,
+        86,
+        7
+      ]
+    },
       {
         "name": "Feedback",
+        "type": {
+          "kind": "struct",
+          "fields": [
+            {
+              "name": "identity",
+              "type": "publicKey"
+            },
+            {
+              "name": "reviewer",
+              "type": "publicKey"
+            },
+            {
+              "name": "rating",
+              "type": "u8"
+            },
+            {
+              "name": "tag",
+              "type": "u8"
+            },
+            {
+              "name": "bump",
+              "type": "u8"
+            },
+            {
+              "name": "ts",
+              "type": "i64"
+            }
+          ]
+        },
         "discriminator": [
           98,
           127,
@@ -293,6 +347,40 @@
       },
       {
         "name": "Validation",
+        "type": {
+          "kind": "struct",
+          "fields": [
+            {
+              "name": "identity",
+              "type": "publicKey"
+            },
+            {
+              "name": "validator",
+              "type": "publicKey"
+            },
+            {
+              "name": "day_yyyymmdd",
+              "type": "u32"
+            },
+            {
+              "name": "merkle_root",
+              "type": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            },
+            {
+              "name": "bump",
+              "type": "u8"
+            },
+            {
+              "name": "ts",
+              "type": "i64"
+            }
+          ]
+        },
         "discriminator": [
           130,
           241,
@@ -320,105 +408,6 @@
         "code": 6002,
         "name": "BadRating",
         "msg": "rating must be 0..=100"
-      }
-    ],
-    "types": [
-      {
-        "name": "Agent",
-        "type": {
-          "kind": "struct",
-          "fields": [
-            {
-              "name": "identity",
-              "type": "pubkey"
-            },
-            {
-              "name": "owner",
-              "type": "pubkey"
-            },
-            {
-              "name": "metadata_uri",
-              "type": "string"
-            },
-            {
-              "name": "bump",
-              "type": "u8"
-            },
-            {
-              "name": "created_at",
-              "type": "i64"
-            }
-          ]
-        }
-      },
-      {
-        "name": "Feedback",
-        "type": {
-          "kind": "struct",
-          "fields": [
-            {
-              "name": "identity",
-              "type": "pubkey"
-            },
-            {
-              "name": "reviewer",
-              "type": "pubkey"
-            },
-            {
-              "name": "rating",
-              "type": "u8"
-            },
-            {
-              "name": "tag",
-              "type": "u8"
-            },
-            {
-              "name": "bump",
-              "type": "u8"
-            },
-            {
-              "name": "ts",
-              "type": "i64"
-            }
-          ]
-        }
-      },
-      {
-        "name": "Validation",
-        "type": {
-          "kind": "struct",
-          "fields": [
-            {
-              "name": "identity",
-              "type": "pubkey"
-            },
-            {
-              "name": "validator",
-              "type": "pubkey"
-            },
-            {
-              "name": "day_yyyymmdd",
-              "type": "u32"
-            },
-            {
-              "name": "merkle_root",
-              "type": {
-                "array": [
-                  "u8",
-                  32
-                ]
-              }
-            },
-            {
-              "name": "bump",
-              "type": "u8"
-            },
-            {
-              "name": "ts",
-              "type": "i64"
-            }
-          ]
-        }
       }
     ]
   }

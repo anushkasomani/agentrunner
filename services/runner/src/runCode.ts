@@ -72,7 +72,7 @@ import * as path from "path";
 const docker = new Docker();
 
 // 👇 Put your metadata URI here
-const METADATA_URI = "https://moccasin-broad-kiwi-732.mypinata.cloud/ipfs/bafkreid5nkjp2exxkka6qczc3aukwyldalsgpnij7gh4b3qh4rskh7h4tu";
+const METADATA_URI = "https://moccasin-broad-kiwi-732.mypinata.cloud/ipfs/bafkreidyzpalwd7r4xlnrdxqnye3zywao4ocuufnnkpyx3hdnobscitaxu";
 
 export async function runPythonAgent() {
   const tmp = await makeTempDir({ unsafeCleanup: true });
@@ -94,7 +94,14 @@ export async function runPythonAgent() {
       writer.on("error", reject);
     });
 
-    // 2️⃣ Run the code inside a Python Docker container
+    // 2️⃣ Read and log the downloaded code
+    // const codeContent = nodefs.readFileSync(codePath, "utf8");
+    // console.log("\n📄 DOWNLOADED CODE TO RUN:");
+    // console.log("=" .repeat(60));
+    // console.log(codeContent);
+    // console.log("=" .repeat(60) + "\n");
+
+    // 3️⃣ Run the code inside a Python Docker container
     console.log("Running code in Docker sandbox...");
 
     const container = await docker.createContainer({
