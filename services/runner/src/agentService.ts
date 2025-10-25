@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { v4 as uuidv4 } from 'uuid';
 
 const execAsync = promisify(exec);
 
@@ -36,24 +37,16 @@ export class AgentService {
     }
 
     try {
-      // In a real implementation, you'd fetch from your API or IPFS
-      // For now, we'll simulate with mock data
-      const mockAgent: AgentRecord = {
-        agentId: agentId,
-        agentPda: 'HXGQvWagr4soQviA3Lr9LPzVw5G1EmstnaivhYE3BCHK',
-        identity: 'ABBtVWcRYZd64waP5HJtKH9CyZLMSP5SbRQ7csuepu6w',
-        metadataUrl: 'https://gateway.pinata.cloud/ipfs/QmExample1',
-        codeUrl: 'https://gateway.pinata.cloud/ipfs/QmExample2',
-        name: 'Swap Agent',
-        description: 'Automatically executes token swaps on Raydium with optimal pricing',
-        author: 'ABBtVWcRYZd64waP5HJtKH9CyZLMSP5SbRQ7csuepu6w',
-        timestamp: Date.now() - 86400000,
-      };
+      // Fetch from IPFS via Pinata gateway
+      const pinataGateway = process.env.PINATA_GATEWAY || 'https://moccasin-broad-kiwi-732.mypinata.cloud';
+      const agentRecordUrl = `${pinataGateway}/ipfs/QmAgents/${agentId}/agent-record.json`;
+      const response = await axios.get(agentRecordUrl);
+      const agentRecord: AgentRecord = response.data;
 
-      this.agentsCache.set(agentId, mockAgent);
-      return mockAgent;
+      this.agentsCache.set(agentId, agentRecord);
+      return agentRecord;
     } catch (error) {
-      console.error('Error fetching agent:', error);
+      console.error('Error fetching agent from IPFS:', error);
       return null;
     }
   }
@@ -130,42 +123,113 @@ export class AgentService {
   }
 
   private async runAgentCode(filePath: string, input: any): Promise<any> {
+    const containerId = uuidv4();
+    const tempDir = path.join(__dirname, 'temp', containerId);
+    
     try {
-      // Create a wrapper script that calls the agent function
-      const wrapperCode = `
-        const agentCode = require('${filePath}');
-        
-        // Execute the agent with input
-        const result = agentCode.execute ? 
-          agentCode.execute(${JSON.stringify(input)}) : 
-          agentCode(${JSON.stringify(input)});
-        
-        console.log(JSON.stringify(result));
-      `;
-
-      const wrapperFile = path.join(path.dirname(filePath), 'wrapper.js');
-      fs.writeFileSync(wrapperFile, wrapperCode);
-
-      // Execute the wrapper
-      const { stdout, stderr } = await execAsync(`node "${wrapperFile}"`);
+      // Create isolated directory for this execution
+      fs.mkdirSync(tempDir, { recursive: true });
       
-      // Clean up wrapper
-      fs.unlinkSync(wrapperFile);
+      // Copy agent code to temp directory
+      const agentFile = path.join(tempDir, 'agent.js');
+      fs.copyFileSync(filePath, agentFile);
+      
+      // Create package.json for dependencies
+      const packageJson = {
+        name: `agent-${containerId}`,
+        version: '1.0.0',
+        main: 'agent.js',
+        dependencies: {
+          // Common dependencies agents might need
+          'axios': '^1.6.0',
+          '@solana/web3.js': '^1.87.0',
+          '@coral-xyz/anchor': '^0.28.0',
+        }
+      };
+      
+      fs.writeFileSync(
+        path.join(tempDir, 'package.json'), 
+        JSON.stringify(packageJson, null, 2)
+      );
+      
+      // Create Dockerfile for isolated execution
+      const dockerfile = `
+FROM node:18-alpine
+WORKDIR /app
+COPY package.json ./
+RUN npm install
+COPY agent.js ./
+CMD ["node", "agent.js"]
+      `.trim();
+      
+      fs.writeFileSync(path.join(tempDir, 'Dockerfile'), dockerfile);
+      
+      // Create wrapper script that handles input/output
+      const wrapperCode = `
+const agentCode = require('./agent.js');
 
+// Execute the agent with input
+const result = agentCode.execute ? 
+  agentCode.execute(${JSON.stringify(input)}) : 
+  agentCode(${JSON.stringify(input)});
+
+console.log(JSON.stringify(result));
+      `;
+      
+      fs.writeFileSync(path.join(tempDir, 'wrapper.js'), wrapperCode);
+      
+      // Build and run Docker container
+      const buildCmd = `docker build -t agent-${containerId} "${tempDir}"`;
+      const runCmd = `docker run --rm -v "${tempDir}:/app" agent-${containerId} node wrapper.js`;
+      
+      console.log('Building Docker container...');
+      await execAsync(buildCmd);
+      
+      console.log('Running agent in Docker container...');
+      const { stdout, stderr } = await execAsync(runCmd);
+      
       if (stderr) {
         throw new Error(stderr);
       }
-
+      
       return JSON.parse(stdout.trim());
+      
     } catch (error) {
-      throw new Error(`Agent execution failed: ${error}`);
+      throw new Error(`Docker execution failed: ${error}`);
+    } finally {
+      // Clean up Docker image and temp directory
+      try {
+        await execAsync(`docker rmi agent-${containerId}`);
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      } catch (cleanupError) {
+        console.warn('Cleanup failed:', cleanupError);
+      }
     }
   }
 
   async getAllAgents(): Promise<AgentRecord[]> {
-    // In a real implementation, you'd fetch from your API or IPFS
-    // For now, return cached agents
-    return Array.from(this.agentsCache.values());
+    try {
+      // Fetch all agents from IPFS via Pinata gateway
+      const pinataGateway = process.env.PINATA_GATEWAY || 'https://moccasin-broad-kiwi-732.mypinata.cloud';
+      const agentsListUrl = `${pinataGateway}/ipfs/QmAgents/agents-list.json`;
+      const response = await axios.get(agentsListUrl);
+      const agentIds: string[] = response.data.agents || [];
+      
+      // Fetch each agent record
+      const agents: AgentRecord[] = [];
+      for (const agentId of agentIds) {
+        const agent = await this.fetchAgentById(agentId);
+        if (agent) {
+          agents.push(agent);
+        }
+      }
+      
+      return agents;
+    } catch (error) {
+      console.error('Error fetching all agents:', error);
+      // Fallback to cached agents
+      return Array.from(this.agentsCache.values());
+    }
   }
 
   clearCache(): void {
