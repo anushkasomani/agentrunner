@@ -2,18 +2,20 @@
 
 import React, { useState, useEffect } from 'react';
 import { Bot, Code, User, Calendar, ExternalLink } from 'lucide-react';
-import axios from 'axios';
+import * as anchor from "@coral-xyz/anchor";
+import { Connection } from '@solana/web3.js';
+import { clusterApiUrl } from '@solana/web3.js';
 
+// This interface matches your UI's needs
 interface Agent {
-  agentId: string;
-  agentPda: string;
-  identity: string;
-  metadataUrl: string;
-  codeUrl: string;
-  name: string;
-  description: string;
-  author: string;
-  timestamp: number;
+  agentId: string;      // Mapped from on-chain 'identity'
+  agentPda: string;     // The account's public key
+  metadataUrl: string;  // Mapped from on-chain 'metadataUri'
+  codeUrl: string;      // Fetched from metadata JSON
+  name: string;         // Fetched from metadata JSON
+  description: string;  // Fetched from metadata JSON
+  author: string;       // Mapped from on-chain 'owner'
+  timestamp: number;    // Mapped from on-chain 'createdAt'
 }
 
 export default function AgentsPage() {
@@ -28,51 +30,96 @@ export default function AgentsPage() {
   const fetchAgents = async () => {
     try {
       setLoading(true);
-      // In a real implementation, you'd fetch from your API or IPFS
-      // For now, we'll simulate with some mock data
-      const mockAgents: Agent[] = [
-        {
-          agentId: 'agent_1234567890_abc123',
-          agentPda: 'HXGQvWagr4soQviA3Lr9LPzVw5G1EmstnaivhYE3BCHK',
-          identity: 'ABBtVWcRYZd64waP5HJtKH9CyZLMSP5SbRQ7csuepu6w',
-          metadataUrl: 'https://gateway.pinata.cloud/ipfs/QmExample1',
-          codeUrl: 'https://gateway.pinata.cloud/ipfs/QmExample2',
-          name: 'Swap Agent',
-          description: 'Automatically executes token swaps on Raydium with optimal pricing',
-          author: 'ABBtVWcRYZd64waP5HJtKH9CyZLMSP5SbRQ7csuepu6w',
-          timestamp: Date.now() - 86400000,
-        },
-        {
-          agentId: 'agent_1234567891_def456',
-          agentPda: 'HXGQvWagr4soQviA3Lr9LPzVw5G1EmstnaivhYE3BCHK',
-          identity: 'ABBtVWcRYZd64waP5HJtKH9CyZLMSP5SbRQ7csuepu6w',
-          metadataUrl: 'https://gateway.pinata.cloud/ipfs/QmExample3',
-          codeUrl: 'https://gateway.pinata.cloud/ipfs/QmExample4',
-          name: 'Rebalance Agent',
-          description: 'Monitors portfolio and rebalances assets based on target allocations',
-          author: 'ABBtVWcRYZd64waP5HJtKH9CyZLMSP5SbRQ7csuepu6w',
-          timestamp: Date.now() - 172800000,
-        },
-      ];
+      const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+      const wallet = window.solana as any;
+      if (!wallet) {
+        throw new Error('Wallet not found');
+      }
+      const provider = new anchor.AnchorProvider(connection, wallet, { preflightCommitment: "processed" });
+      let idl;
+      try {
+        const idlModule = await import('../services/registry-idl.json');
+        idl = idlModule.default;
+      } catch {
+        // Fallback to fetch
+        const idlResponse = await fetch('/services/registry-idl.json');
+        idl = await idlResponse.json();
+      }
+      const program = new anchor.Program(idl, provider);
+
+      // 1. Fetch the raw on-chain account data
+      const agentsFromChain = await program.account.agent.all();
+      console.log('Raw agents from chain:', agentsFromChain);
+
+      // 2. Filter agents based on your criteria (metadataUri starts with 'https')
+      const filteredAgents = agentsFromChain.filter(agent => 
+        agent.account.metadataUri && agent.account.metadataUri.startsWith('https')
+      );
+      console.log(`Found ${filteredAgents.length} agents with valid metadata URIs`);
+
+      // 3. Create promises to fetch metadata for each filtered agent
+      const agentPromises = filteredAgents.map(async (agentEntry) => {
+        try {
+          const onChainAccount = agentEntry.account;
+          
+          // Fetch the external JSON metadata
+          const response = await fetch(onChainAccount.metadataUri);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch metadata from ${onChainAccount.metadataUri}`);
+          }
+          const metadata = await response.json();
+
+          // 4. Combine on-chain data and metadata JSON data
+          return {
+            // --- From On-chain Account ---
+            agentPda: agentEntry.publicKey.toString(),
+            agentId: onChainAccount.identity.toString(), // Use 'identity'
+            author: onChainAccount.owner.toString(),     // Use 'owner'
+            timestamp: onChainAccount.createdAt.toNumber(), // Use 'createdAt'
+            metadataUrl: onChainAccount.metadataUri,
+            
+            // --- From Fetched Metadata JSON ---
+            name: metadata.name,
+            description: metadata.description,
+            codeUrl: metadata.codeUrl || '#', // Use '#' as fallback if codeUrl isn't in JSON
+          } as Agent;
+
+        } catch (e) {
+          console.error(`Failed to process agent ${agentEntry.publicKey.toString()}:`, e);
+          return null; // Return null if fetching or parsing fails
+        }
+      });
+
+      // 5. Wait for all metadata fetches to complete
+      const settledAgents = await Promise.all(agentPromises);
       
-      setAgents(mockAgents);
+      // 6. Filter out any agents that failed to load (returned null)
+      const successfulAgents = settledAgents.filter(agent => agent !== null) as Agent[];
+      
+      console.log('Final formatted & populated agents:', successfulAgents);
+      setAgents(successfulAgents);
+
     } catch (err) {
-      setError('Failed to fetch agents');
-      console.error('Error fetching agents:', err);
+      console.error('Error in fetchAgents:', err);
+      setError('Failed to load agents');
     } finally {
       setLoading(false);
     }
   };
 
   const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleDateString('en-US', {
+    // On-chain timestamps are often in seconds. Multiply by 1000 for JS Date (milliseconds).
+    return new Date(timestamp * 1000).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
     });
   };
 
-  const truncateAddress = (address: string) => {
+  const truncateAddress = (address: string | null | undefined) => {
+    if (!address || address.length < 8) {
+      return address || '...';
+    }
     return `${address.slice(0, 4)}...${address.slice(-4)}`;
   };
 
@@ -134,14 +181,14 @@ export default function AgentsPage() {
               No Agents Found
             </h3>
             <p className="text-gray-500">
-              Be the first to deploy an agent to our platform!
+              No agents with valid metadata were found. Be the first to deploy one!
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {agents.map((agent) => (
               <div
-                key={agent.agentId}
+                key={agent.agentPda} // Use the unique PDA for the key
                 className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 p-6"
               >
                 <div className="flex items-start justify-between mb-4">

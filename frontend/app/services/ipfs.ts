@@ -13,20 +13,10 @@ interface AgentMetadata {
   version: string;
   author: string;
   agentId: string;
+  agentPda: string; 
   timestamp: number;
 }
 
-interface AgentRecord {
-  agentId: string;
-  agentPda: string;
-  identity: string;
-  metadataUrl: string;
-  codeUrl: string;
-  name: string;
-  description: string;
-  author: string;
-  timestamp: number;
-}
 
 export class IPFSService {
   private pinataApiKey: string;
@@ -75,7 +65,7 @@ export class IPFSService {
   async uploadCode(code: string, filename: string): Promise<string> {
     try {
       const formData = new FormData();
-      const blob = new Blob([code], { type: 'text/javascript' });
+      const blob = new Blob([code], { type: 'text/javascript/python' });
       formData.append('file', blob, filename);
 
       const metadata = JSON.stringify({
@@ -108,36 +98,4 @@ export class IPFSService {
     }
   }
 
-  async uploadAgentRecord(agentRecord: AgentRecord, agentId: string): Promise<string> {
-    try {
-      const data = JSON.stringify({
-        pinataContent: agentRecord,
-        pinataMetadata: {
-          name: `agent-record-${agentId}`,
-        },
-        pinataOptions: {
-          cidVersion: 1,
-        },
-      });
-
-      const config = {
-        method: 'post',
-        url: 'https://api.pinata.cloud/pinning/pinJSONToIPFS',
-        headers: {
-          'Content-Type': 'application/json',
-          pinata_api_key: this.pinataApiKey,
-          pinata_secret_api_key: this.pinataSecretKey,
-        },
-        data: data,
-      };
-
-      const response = await axios(config);
-      const result: PinataResponse = response.data;
-      
-      return `${this.pinataGateway}/ipfs/${result.IpfsHash}`;
-    } catch (error) {
-      console.error('Error uploading agent record to IPFS:', error);
-      throw new Error('Failed to upload agent record to IPFS');
-    }
-  }
 }

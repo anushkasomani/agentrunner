@@ -39,18 +39,12 @@ export default function AgentRegistrationForm() {
     }));
   };
 
-  const registerAgentOnSolana = async (metadataUri: string, agentId: string): Promise<PublicKey> => {
+  const registerAgentOnSolana = async (metadataUri: string, agentIdentity: PublicKey): Promise<PublicKey> => {
     if (!publicKey || !signTransaction) {
       throw new Error('Wallet not connected');
     }
 
-    // Create agent identity (using agentId as seed)
-    const agentIdentity = PublicKey.findProgramAddressSync(
-      [Buffer.from('agent_identity'), Buffer.from(agentId)],
-      PROGRAM_ID
-    )[0];
-
-    // Create agent PDA
+    // Create agent PDA using the identity
     const [agentPda] = PublicKey.findProgramAddressSync(
       [Buffer.from('agent'), agentIdentity.toBuffer()],
       PROGRAM_ID
@@ -97,6 +91,10 @@ export default function AgentRegistrationForm() {
       .rpc();
 
     console.log('Agent registered on Solana:', tx);
+
+    //fetch agent from solana
+    const agents = await program.account.agent.all();
+    console.log('Agents:', agents);
     return agentPda;
   };
 
@@ -121,39 +119,39 @@ export default function AgentRegistrationForm() {
       // Generate unique agent ID
       const agentId = `agent_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-      // Upload metadata
+      // Create agent identity using agentId as seed
+      const agentIdentity = PublicKey.findProgramAddressSync(
+        [Buffer.from('agent'), Buffer.from(agentId)],
+        PROGRAM_ID
+      )[0];
+      
+      // Pre-determine agent PDA using Solana PDAs
+      const [agentPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from('agent'), agentIdentity.toBuffer()],
+        PROGRAM_ID
+      );
+      
+      //upload code 
+      const codeUrl = await ipfsService.uploadCode(formData.code, `${formData.name}.py`);
+
+      // Upload metadata with pre-determined agentPda
       const metadata = {
         name: formData.name,
         description: formData.description,
-        code: formData.code,
+        code: codeUrl,
         version: '1.0.0',
         author: publicKey.toString(),
         agentId: agentId,
+        agentPda: agentPda.toString(), 
         timestamp: Date.now(),
       };
       
       const metadataUrl = await ipfsService.uploadAgentMetadata(metadata);
       
-      // Upload code separately
-      const codeUrl = await ipfsService.uploadCode(formData.code, `${formData.name}.js`);
-      
       // Register agent on Solana
-      const agentPda = await registerAgentOnSolana(metadataUrl, agentId);
+      await registerAgentOnSolana(metadataUrl, agentIdentity);
       
-      // Upload final agent record to dedicated folder
-      const finalAgentRecord = {
-        agentId,
-        agentPda: agentPda.toString(),
-        identity: publicKey.toString(),
-        metadataUrl,
-        codeUrl,
-        name: formData.name,
-        description: formData.description,
-        author: publicKey.toString(),
-        timestamp: Date.now(),
-      };
-      
-      await ipfsService.uploadAgentRecord(finalAgentRecord, agentId);
+      // Simple success - no complex folder logic needed
       
       setUploadResult({
         metadataUrl,
