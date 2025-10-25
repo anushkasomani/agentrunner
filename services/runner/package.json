@@ -18,10 +18,17 @@
     "axios": "^1.12.2",
     "bs58": "^4.0.1",
     "bullmq": "^4.15.0",
+    "dockerode": "^4.0.9",
     "dotenv": "^16.6.1",
     "express": "4.19.2",
+    "fs-extra": "^11.3.2",
     "ioredis": "5.4.1",
     "node-fetch": "3.3.2",
+    "tmp-promise": "^3.0.3",
     "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/dockerode": "^3.3.45",
+    "@types/fs-extra": "^11.0.4"
   }
 }

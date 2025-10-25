@@ -30,9 +30,9 @@ async function makePayment(invoice: string): Promise<any> {
         throw new Error("PAYER_SECRET_KEY not set");
     }
     
-    // Parse invoice to get amount
+    
     const invoiceData = JSON.parse(invoice);
-    const amount = 0.001; // Fixed amount for testing
+    const amount = 0.001; 
     
     try {
         // Get payer's USDC token account
