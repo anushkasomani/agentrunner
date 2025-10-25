@@ -1,5 +1,3 @@
-
-
 import stringify from "fast-json-stable-stringify";
 import * as ed from "@noble/ed25519";
 

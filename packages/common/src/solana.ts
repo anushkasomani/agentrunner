@@ -1,6 +1,7 @@
 // @ts-nocheck
 import {
     createSolanaRpc,
+    createSolanaRpcSubscriptions,
     generateKeyPairSigner,
     createTransactionMessage,
     setTransactionMessageFeePayerSigner,
@@ -16,6 +17,7 @@ import {
   
   export async function sendV0Tx(instructions: any[], feePayer?: any) {
     const rpcConn = rpc();
+    const rpcSubscriptions = createSolanaRpcSubscriptions(RPC_URL);
     const feePayerSigner = feePayer ?? await generateKeyPairSigner();
     const { value: { blockhash } } = await rpcConn.getLatestBlockhash().send();
   
@@ -23,9 +25,9 @@ import {
       createTransactionMessage({ version: 0 }),
       (m) => setTransactionMessageFeePayerSigner(feePayerSigner, m),
     );
-    const tx = await message.compileToV0Transaction({ blockhash });
-    const sendAndConfirm = sendAndConfirmTransactionFactory({ rpc: rpcConn });
-    const sig = await sendAndConfirm(tx);
+    const tx = await (message as any).compileToV0Transaction({ blockhash });
+    const sendAndConfirm = sendAndConfirmTransactionFactory({ rpc: rpcConn, rpcSubscriptions });
+    const sig = await sendAndConfirm(tx, { commitment: 'confirmed' });
     return sig;
   }
   
