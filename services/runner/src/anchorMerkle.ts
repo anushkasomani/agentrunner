@@ -106,6 +106,6 @@ export async function anchorMerkleRoot(hexRoot: string, day?: string) {
   }
 }
 
-anchorMerkleRoot(
-  "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-);
+// anchorMerkleRoot(
+//   "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+// );
