@@ -10,6 +10,7 @@ interface AgentMetadata {
   name: string;
   description: string;
   code: string;
+  charge: string;
   version: string;
   author: string;
   agentId: string;
