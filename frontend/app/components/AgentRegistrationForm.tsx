@@ -119,13 +119,12 @@ export default function AgentRegistrationForm() {
       // Generate unique agent ID
       const agentId = `agent_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-      // Create agent identity using agentId as seed
-      const agentIdentity = PublicKey.findProgramAddressSync(
-        [Buffer.from('agent'), Buffer.from(agentId)],
-        PROGRAM_ID
-      )[0];
+      // Create agent identity directly from agentId
+      const agentIdentity = new PublicKey(
+        Buffer.from(agentId.padEnd(32, '\0')).slice(0, 32)
+      );
       
-      // Pre-determine agent PDA using Solana PDAs
+      // Pre-determine agent PDA using the identity directly
       const [agentPda] = PublicKey.findProgramAddressSync(
         [Buffer.from('agent'), agentIdentity.toBuffer()],
         PROGRAM_ID

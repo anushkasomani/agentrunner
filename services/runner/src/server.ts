@@ -116,8 +116,8 @@ app.get("/receipts", (_req, res) => {
 app.post("/anchor/daily", async (_req, res) => {
   try {
     const { root } = buildDailyMerkle(RECEIPTS);
-    const { txid, date } = await anchorMerkleRoot(root);
-    return res.json({ ok:true, root, date, txid, count: RECEIPTS.length });
+    const { txSig, date } = await anchorMerkleRoot(root);
+    return res.json({ ok:true, root, date, txSig, count: RECEIPTS.length });
   } catch (e:any) {
     return res.status(400).json({ ok:false, error: e.message });
   }

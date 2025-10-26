@@ -1,5 +1,5 @@
 import * as anchor from "@coral-xyz/anchor";
-import { Connection, Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
+import { Connection, Keypair, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -16,8 +16,9 @@ const RPC =
   "https://api.devnet.solana.com";
 
 const PROGRAM_ID = new PublicKey("HXGQvWagr4soQviA3Lr9LPzVw5G1EmstnaivhYE3BCHK");
+const agentId = process.env.AGENT_ID || "agent_1761428435017_zgfv8g2bu";
 const AGENT_IDENTITY = new PublicKey(
-  process.env.AGENT_IDENTITY || "ABBtVWcRYZd64waP5HJtKH9CyZLMSP5SbRQ7csuepu6w"
+  Buffer.from(agentId.padEnd(32, '\0')).slice(0, 32)
 );
 
 function loadValidator(): Keypair {
@@ -52,39 +53,59 @@ export async function anchorMerkleRoot(hexRoot: string, day?: string) {
   // ✅ Use the normalized IDL — works in both ESM and CJS
   const program = new anchor.Program(idl, PROGRAM_ID, provider);
 
-  const dayStr = day || yyyymmdd();
+  const dayStr = day || "0";
   const dayU32 = parseInt(dayStr);
   const rootBytes = Buffer.from(hexRoot.replace(/^0x/, ""), "hex");
-
   const [agentPda] = PublicKey.findProgramAddressSync(
-    [Buffer.from("agent"), AGENT_IDENTITY.toBuffer()],
+    [Buffer.from('agent'), AGENT_IDENTITY.toBuffer()],
     PROGRAM_ID
   );
 
+  const dayBuffer = Buffer.alloc(4);
+  dayBuffer.writeUInt32LE(dayU32, 0);
+  
   const [validationPda] = PublicKey.findProgramAddressSync(
     [
       Buffer.from("validation"),
       AGENT_IDENTITY.toBuffer(),
-      new anchor.BN(dayU32).toArrayLike(Buffer, "le", 4),
+      dayBuffer,
     ],
     PROGRAM_ID
   );
 
-  const txSig = await program.methods
-    .postValidation(dayU32, Array.from(rootBytes))
-    .accounts({
-      validator: validator.publicKey,
-      agent: agentPda,
-      validation: validationPda,
-      systemProgram: SystemProgram.programId,
-    })
-    .signers([validator])
-    .rpc();
 
-  console.log({ txSig, date: dayStr });
-  return { txSig, date: dayStr };
+  try {
+    const instruction = await program.methods
+      .postValidation(dayU32, Array.from(rootBytes))
+      .accounts({
+        validator: validator.publicKey,
+        agent: agentPda,
+        validation: validationPda,
+        system_program: SystemProgram.programId,
+      })
+      .instruction();
+
+    const transaction = new Transaction().add(instruction);
+    const { blockhash } = await connection.getLatestBlockhash();
+    transaction.recentBlockhash = blockhash;
+    transaction.feePayer = validator.publicKey;
+    
+    transaction.sign(validator);
+    
+    const txSig = await connection.sendRawTransaction(transaction.serialize(), {
+      skipPreflight: true,
+      preflightCommitment: 'confirmed'
+    });
+    await connection.confirmTransaction(txSig);
+    
+    console.log({ txSig, date: dayStr });
+    return { txSig, date: dayStr };
+  } catch (error) {
+    console.error('Transaction failed:', error);
+    throw error;
+  }
 }
 
-anchorMerkleRoot(
-  "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-);
+// anchorMerkleRoot(
+//   "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+// );

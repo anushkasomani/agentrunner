@@ -94,7 +94,14 @@ export async function runPythonAgent() {
       writer.on("error", reject);
     });
 
-    // 2️⃣ Run the code inside a Python Docker container
+    // 2️⃣ Read and log the downloaded code
+    // const codeContent = nodefs.readFileSync(codePath, "utf8");
+    // console.log("\n📄 DOWNLOADED CODE TO RUN:");
+    // console.log("=" .repeat(60));
+    // console.log(codeContent);
+    // console.log("=" .repeat(60) + "\n");
+
+    // 3️⃣ Run the code inside a Python Docker container
     console.log("Running code in Docker sandbox...");
 
     const container = await docker.createContainer({
