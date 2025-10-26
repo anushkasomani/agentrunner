@@ -5,6 +5,7 @@
     "baseUrl": ".",
     "moduleResolution": "node",
     "allowImportingTsExtensions": true,
+    "module": "CommonJS",
     "noEmit": true,
     "paths": {
       "@agentrunner/common": ["../../packages/common/src"],

@@ -1,7 +1,7 @@
 {
   "name": "@agentrunner/runner",
   "version": "0.1.0",
-  "type": "module",
+  "type": "commonjs",
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -25,10 +25,12 @@
     "ioredis": "5.4.1",
     "node-fetch": "3.3.2",
     "tmp-promise": "^3.0.3",
+    "ts-node": "^10.9.2",
     "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@types/dockerode": "^3.3.45",
-    "@types/fs-extra": "^11.0.4"
+    "@types/fs-extra": "^11.0.4",
+    "tsx": "^4.20.6"
   }
 }

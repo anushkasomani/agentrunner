@@ -72,7 +72,7 @@ import * as path from "path";
 const docker = new Docker();
 
 // 👇 Put your metadata URI here
-const METADATA_URI = "https://moccasin-broad-kiwi-732.mypinata.cloud/ipfs/bafkreid5nkjp2exxkka6qczc3aukwyldalsgpnij7gh4b3qh4rskh7h4tu";
+const METADATA_URI = "https://moccasin-broad-kiwi-732.mypinata.cloud/ipfs/bafkreidyzpalwd7r4xlnrdxqnye3zywao4ocuufnnkpyx3hdnobscitaxu";
 
 export async function runPythonAgent() {
   const tmp = await makeTempDir({ unsafeCleanup: true });
