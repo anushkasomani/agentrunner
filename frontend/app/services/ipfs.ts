@@ -11,6 +11,7 @@ interface AgentMetadata {
   description: string;
   code: string;
   charge: string;
+  capability: string;
   version: string;
   author: string;
   agentId: string;
