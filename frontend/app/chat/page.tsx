@@ -12,12 +12,15 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   ts: number;
+  id: string;
+  loadingState?: 'planning' | 'rfp' | 'offers' | 'hiring' | 'executing' | 'completed';
 }
 
 const INITIAL_MESSAGE: Message = {
   role: 'assistant',
   content: 'Tell me your DeFi goal…',
   ts: Date.now(),
+  id: 'initial-message'
 };
 
 const QUICK_ACTIONS = [
@@ -52,33 +55,52 @@ export default function ChatPage() {
   const [budget, setBudget] = useState(0.2);
   const [isHydrated, setIsHydrated] = useState(false);
 
-  // Hydrate from localStorage on mount
+  // Hydrate from localStorage on mount and when wallet changes
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('ar-chat');
+      const storageKey = publicKey ? `ar-chat-${publicKey.toString()}` : 'ar-chat-anonymous';
+      const saved = localStorage.getItem(storageKey);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setMessages(parsed);
+          // Ensure all messages have unique IDs
+          const messagesWithIds = parsed.map((msg: any, index: number) => ({
+            ...msg,
+            id: msg.id || `${msg.role}-${msg.ts}-${index}-${Math.random().toString(36).substr(2, 9)}`
+          }));
+          setMessages(messagesWithIds);
+        } else {
+          setMessages([INITIAL_MESSAGE]);
         }
+      } else {
+        setMessages([INITIAL_MESSAGE]);
       }
     } catch (error) {
       console.error('Failed to hydrate messages:', error);
+      setMessages([INITIAL_MESSAGE]);
     }
 
     setIsHydrated(true);
-  }, []);
+  }, [publicKey]);
 
   // Persist messages to localStorage
   useEffect(() => {
     if (isHydrated) {
       try {
-        localStorage.setItem('ar-chat', JSON.stringify(messages));
+        const storageKey = publicKey ? `ar-chat-${publicKey.toString()}` : 'ar-chat-anonymous';
+        localStorage.setItem(storageKey, JSON.stringify(messages));
       } catch (error) {
         console.error('Failed to save messages:', error);
       }
     }
-  }, [messages, isHydrated]);
+  }, [messages, isHydrated, publicKey]);
+
+  // Clear messages when wallet disconnects
+  useEffect(() => {
+    if (isHydrated && !publicKey) {
+      setMessages([INITIAL_MESSAGE]);
+    }
+  }, [publicKey, isHydrated]);
 
   const handleSend = async (text: string, budgetAmount: number) => {
     // Guard against double-submit
@@ -89,43 +111,224 @@ export default function ChatPage() {
       role: 'user',
       content: text,
       ts: Date.now(),
+      id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     };
     setMessages((prev) => [...prev, userMessage]);
     setLoading(true);
 
     try {
-      // Call planner
+      // Step 1: Call planner
+      console.log('🚀 Starting execution flow...');
+      console.log('📝 User request:', text);
+      console.log('💰 Budget:', budgetAmount);
+      
+      const planningMessage: Message = {
+        role: 'assistant',
+        content: '🤖 Planning your DeFi strategy...',
+        ts: Date.now(),
+        id: `planning-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        loadingState: 'planning'
+      };
+      setMessages((prev) => [...prev, planningMessage]);
+
+      console.log('📞 Calling planner service...');
       const plan = await callPlanner(text, budgetAmount);
-
-      // Summarize plan
+      console.log('✅ Plan received:', JSON.stringify(plan, null, 2));
+      
       const { summary } = summarizePlan(plan);
+      console.log('📋 Plan summary:', summary);
 
-      // Build assistant message with summary and JSON panel
-      let assistantContent = summary;
+      // Show plan details first
+      const planDetailsMessage: Message = {
+        role: 'assistant',
+        content: `📋 **Plan Generated!**\n\n${summary}\n\n**Plan Details:**\n\`\`\`json\n${JSON.stringify(plan, null, 2)}\n\`\`\`\n\n🎯 **Next:** Creating RFP for agent hiring...`,
+        ts: Date.now(),
+        id: `plan-details-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        loadingState: 'completed'
+      };
+      setMessages((prev) => [...prev.slice(0, -1), planDetailsMessage]);
 
-      if (!publicKey) {
-        assistantContent += '\n\n_Connect your wallet to execute (RFP → hire → x402 → run)._';
+      // Step 2: Create RFP
+      console.log('📋 Creating RFP...');
+      const rfpMessage: Message = {
+        role: 'assistant',
+        content: '📋 Creating Request for Proposal...',
+        ts: Date.now(),
+        id: `rfp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        loadingState: 'rfp'
+      };
+      setMessages((prev) => [...prev, rfpMessage]);
+
+      const rfpPayload = {
+        capability: plan.steps[0]?.capability || 'generic',
+        inputs: plan.steps[0]?.inputs || {},
+        constraints: plan.steps[0]?.constraints || {},
+        budget_usd: budgetAmount,
+        slo: plan.steps[0]?.slo || { p95_ms: 3000 }
+      };
+      console.log('📤 RFP payload:', JSON.stringify(rfpPayload, null, 2));
+
+      const rfpResponse = await fetch('/api/broker?path=/rfp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rfpPayload)
+      });
+
+      console.log('📥 RFP response status:', rfpResponse.status);
+      if (!rfpResponse.ok) {
+        const errorText = await rfpResponse.text();
+        console.error('❌ RFP creation failed:', errorText);
+        throw new Error(`RFP creation failed: ${errorText}`);
       }
 
-      // Add JSON in a code block (more reliable than HTML)
-      assistantContent += `\n\n**Raw Plan (JSON):**\n\`\`\`json\n${JSON.stringify(plan, null, 2)}\n\`\`\``;
+      const rfpData = await rfpResponse.json();
+      const rfpId = rfpData.rfp_id;
+      console.log('✅ RFP created with ID:', rfpId);
 
-      const assistantMessage: Message = {
+      // Update with RFP success
+      const rfpSuccessMessage: Message = {
         role: 'assistant',
-        content: assistantContent,
+        content: `✅ **RFP Created!**\n\n**RFP ID:** \`${rfpId}\`\n**Capability:** ${plan.steps[0]?.capability || 'generic'}\n**Budget:** $${budgetAmount}\n\n💰 **Next:** Fetching agent offers...`,
         ts: Date.now(),
+        id: `rfp-success-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        loadingState: 'offers'
+      };
+      setMessages((prev) => [...prev.slice(0, -1), rfpSuccessMessage]);
+
+      // Step 3: Get offers
+      console.log('💰 Fetching offers...');
+
+      const offersResponse = await fetch(`/api/broker?path=/rfp/${rfpId}/offers`);
+      console.log('📥 Offers response status:', offersResponse.status);
+      
+      if (!offersResponse.ok) {
+        const errorText = await offersResponse.text();
+        console.error('❌ Failed to get offers:', errorText);
+        throw new Error(`Failed to get offers: ${errorText}`);
+      }
+
+      const offersData = await offersResponse.json();
+      const offers = offersData.offers;
+      console.log('✅ Offers received:', JSON.stringify(offers, null, 2));
+
+      // Show offers received
+      const offersList = offers.map((o: any, idx: number) => 
+        `${idx + 1}. **Agent:** ${o.agent_id}\n   💰 **Price:** $${o.price_usd}\n   ⏱️ **ETA:** ${o.eta_ms}ms\n   📊 **Confidence:** ${(o.confidence * 100).toFixed(0)}%`
+      ).join('\n\n');
+
+      const offersSuccessMessage: Message = {
+        role: 'assistant',
+        content: `💰 **Offers Received!**\n\n**Found ${offers.length} agent(s):**\n\n${offersList}\n\n🎯 **Next:** Selecting best agent...`,
+        ts: Date.now(),
+        id: `offers-success-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        loadingState: 'hiring'
+      };
+      setMessages((prev) => [...prev.slice(0, -1), offersSuccessMessage]);
+
+      // Step 4: Hire best agent
+      console.log('🎯 Hiring best agent...');
+
+      const hireResponse = await fetch('/api/broker?path=/hire', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rfp_id: rfpId })
+      });
+
+      console.log('📥 Hire response status:', hireResponse.status);
+      if (!hireResponse.ok) {
+        const errorText = await hireResponse.text();
+        console.error('❌ Hiring failed:', errorText);
+        throw new Error(`Hiring failed: ${errorText}`);
+      }
+
+      const hireData = await hireResponse.json();
+      const hiredAgent = hireData.hired;
+      console.log('✅ Agent hired:', JSON.stringify(hiredAgent, null, 2));
+
+      // Show hired agent details
+      const hiredAgentMessage: Message = {
+        role: 'assistant',
+        content: `🎯 **Agent Hired!**\n\n**Agent ID:** \`${hiredAgent.agent_id}\`\n**Price:** $${hiredAgent.price_usd}\n**ETA:** ${hiredAgent.eta_ms}ms\n**Score:** ${hiredAgent.score?.toFixed(2) || 'N/A'}\n\n⚡ **Next:** Executing transaction...`,
+        ts: Date.now(),
+        id: `hired-agent-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        loadingState: 'executing'
+      };
+      setMessages((prev) => [...prev.slice(0, -1), hiredAgentMessage]);
+
+      // Step 5: Execute with hired agent
+      console.log('⚡ Executing with hired agent...');
+
+      const runPayload = {
+        inMint: plan.steps[0]?.inputs?.inMint || "So11111111111111111111111111111111111111112",
+        outMint: plan.steps[0]?.inputs?.outMint || "USDCoctVLVnvTXBEuP9s8hntucdJokbo17RwHuNXemT",
+        amount: plan.steps[0]?.inputs?.amount || "1000000",
+        slippageBps: plan.steps[0]?.constraints?.slippage_bps_max || 30,
+        pythPriceIds: plan.steps[0]?.inputs?.pythPriceIds || []
+      };
+      console.log('📤 Run payload:', JSON.stringify(runPayload, null, 2));
+
+      const runResponse = await fetch('/api/runner?path=/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(runPayload)
+      });
+
+      console.log('📥 Run response status:', runResponse.status);
+      if (!runResponse.ok) {
+        const errorText = await runResponse.text();
+        console.error('❌ Execution failed:', errorText);
+        throw new Error(`Execution failed: ${errorText}`);
+      }
+
+      const runData = await runResponse.json();
+      console.log('✅ Execution completed:', JSON.stringify(runData, null, 2));
+
+      // Show execution details
+      const executionDetails = `
+**Transaction Details:**
+- **Input Mint:** \`${runPayload.inMint.slice(0, 8)}...${runPayload.inMint.slice(-8)}\`
+- **Output Mint:** \`${runPayload.outMint.slice(0, 8)}...${runPayload.outMint.slice(-8)}\`
+- **Amount:** ${runPayload.amount}
+- **Slippage:** ${runPayload.slippageBps} bps
+`;
+
+      // Final success message
+      let finalContent = `✅ **Execution Complete!**\n\n`;
+      finalContent += `**Plan Summary:** ${summary}\n\n`;
+      finalContent += `**Agent Details:**\n`;
+      finalContent += `- Agent ID: \`${hiredAgent.agent_id}\`\n`;
+      finalContent += `- Service Fee: $${hiredAgent.price_usd}\n`;
+      finalContent += `- Score: ${hiredAgent.score?.toFixed(2) || 'N/A'}\n\n`;
+      finalContent += executionDetails;
+      finalContent += `**Status:** ${runData.ok ? '✅ Success' : '❌ Failed'}\n\n`;
+
+      if (!publicKey) {
+        finalContent += `_💡 Connect your wallet to execute future plans._\n\n`;
+      }
+
+      finalContent += `**📋 Full Plan:**\n\`\`\`json\n${JSON.stringify(plan, null, 2)}\n\`\`\``;
+
+      const finalMessage: Message = {
+        role: 'assistant',
+        content: finalContent,
+        ts: Date.now(),
+        id: `final-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        loadingState: 'completed'
       };
 
-      setMessages((prev) => [...prev, assistantMessage]);
+      setMessages((prev) => [...prev.slice(0, -1), finalMessage]);
+      console.log('🎉 Complete execution flow finished successfully!');
+
     } catch (error) {
-      console.error('Planner error:', error);
+      console.error('💥 Execution error:', error);
       const errorMessage: Message = {
         role: 'assistant',
-        content:
-          'Planner failed. Try again or simplify the goal.',
+        content: `❌ **Execution Failed**\n\n**Error:** ${error instanceof Error ? error.message : 'Unknown error'}\n\n**Troubleshooting:**\n1. Check that services are running\n2. Verify your wallet is connected\n3. Try simplifying your request\n4. Check console logs for details`,
         ts: Date.now(),
+        id: `error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        loadingState: 'completed'
       };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((prev) => [...prev.slice(0, -1), errorMessage]);
     } finally {
       setLoading(false);
     }

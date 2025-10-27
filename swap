@@ -1,0 +1,4 @@
+const out = await swap({
+      inMint: body.inMint, outMint: body.outMint, amount: body.amount, slippageBps: body.slippageBps,
+      pythPriceIds: body.pythPriceIds, guard
+    });
