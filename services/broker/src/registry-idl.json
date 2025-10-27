@@ -1,0 +1,424 @@
+{
+  "address": "HXGQvWagr4soQviA3Lr9LPzVw5G1EmstnaivhYE3BCHK",
+  "metadata": {
+    "name": "registry",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "post_feedback",
+      "docs": [
+        "Create or update feedback (rating 0-100, optional tag bucket). One per (reviewer, identity)."
+      ],
+      "discriminator": [
+        117,
+        44,
+        254,
+        225,
+        39,
+        205,
+        248,
+        232
+      ],
+      "accounts": [
+        {
+          "name": "reviewer",
+          "docs": [
+            "reviewer is the payer — must be mutable"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "agent",
+          "docs": [
+            "Agent existence check"
+          ]
+        },
+        {
+          "name": "feedback",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  100,
+                  98,
+                  97,
+                  99,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.identity",
+                "account": "Agent"
+              },
+              {
+                "kind": "account",
+                "path": "reviewer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "rating",
+          "type": "u8"
+        },
+        {
+          "name": "tag",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "post_validation",
+      "docs": [
+        "Post a daily validation (e.g., Merkle root of receipts). Any signer can validate; trust is off-chain."
+      ],
+      "discriminator": [
+        24,
+        163,
+        248,
+        133,
+        135,
+        173,
+        2,
+        201
+      ],
+      "accounts": [
+        {
+          "name": "validator",
+          "docs": [
+            "Validator posting the root (payer) — must be mutable because Anchor will debit lamports."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "agent",
+          "docs": [
+            "Ensure the agent exists (no need to be mut if not modified)"
+          ]
+        },
+        {
+          "name": "validation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.identity",
+                "account": "Agent"
+              },
+              {
+                "kind": "arg",
+                "path": "day_yyyymmdd"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "day_yyyymmdd",
+          "type": "u32"
+        },
+        {
+          "name": "merkle_root",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "register_agent",
+      "docs": [
+        "Create an Agent record bound to an identity pubkey, owned by `owner`."
+      ],
+      "discriminator": [
+        135,
+        157,
+        66,
+        195,
+        2,
+        113,
+        175,
+        30
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "docs": [
+            "payer must be mutable when used with `init`"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "identity"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "identity",
+          "type": "pubkey"
+        },
+        {
+          "name": "metadata_uri",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "update_agent",
+      "docs": [
+        "Update the agent's metadata (only the owner)."
+      ],
+      "discriminator": [
+        85,
+        2,
+        178,
+        9,
+        119,
+        139,
+        102,
+        164
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "docs": [
+            "owner signs the update"
+          ],
+          "signer": true
+        },
+        {
+          "name": "agent",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "metadata_uri",
+          "type": "string"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Agent",
+      "discriminator": [
+        47,
+        166,
+        112,
+        147,
+        155,
+        197,
+        86,
+        7
+      ]
+    },
+    {
+      "name": "Feedback",
+      "discriminator": [
+        98,
+        127,
+        169,
+        126,
+        107,
+        43,
+        78,
+        220
+      ]
+    },
+    {
+      "name": "Validation",
+      "discriminator": [
+        130,
+        241,
+        151,
+        113,
+        169,
+        195,
+        219,
+        148
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "MetadataTooLong",
+      "msg": "metadata uri too long"
+    },
+    {
+      "code": 6001,
+      "name": "Unauthorized",
+      "msg": "unauthorized"
+    },
+    {
+      "code": 6002,
+      "name": "BadRating",
+      "msg": "rating must be 0..=100"
+    }
+  ],
+  "types": [
+    {
+      "name": "Agent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "metadata_uri",
+            "type": "string"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Feedback",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "reviewer",
+            "type": "pubkey"
+          },
+          {
+            "name": "rating",
+            "type": "u8"
+          },
+          {
+            "name": "tag",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "ts",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Validation",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "day_yyyymmdd",
+            "type": "u32"
+          },
+          {
+            "name": "merkle_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "ts",
+            "type": "i64"
+          }
+        ]
+      }
+    }
+  ]
+}

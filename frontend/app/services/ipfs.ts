@@ -66,7 +66,7 @@ export class IPFSService {
   async uploadCode(code: string, filename: string): Promise<string> {
     try {
       const formData = new FormData();
-      const blob = new Blob([code], { type: 'text/javascript/python' });
+      const blob = new Blob([code], { type: 'text/typescript/python' });
       formData.append('file', blob, filename);
 
       const metadata = JSON.stringify({

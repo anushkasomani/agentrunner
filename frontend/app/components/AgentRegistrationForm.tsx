@@ -12,6 +12,7 @@ interface AgentFormData {
   description: string;
   code: string;
   charge: string;
+  capability: string;
 }
 
 const PROGRAM_ID = new PublicKey("HXGQvWagr4soQviA3Lr9LPzVw5G1EmstnaivhYE3BCHK");
@@ -24,6 +25,7 @@ export default function AgentRegistrationForm() {
     description: '',
     code: '',
     charge: '',
+    capability: '',
   });
   const [isUploading, setIsUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<{
@@ -112,7 +114,7 @@ export default function AgentRegistrationForm() {
       return;
     }
 
-    if (!formData.name || !formData.description || !formData.code || !formData.charge) {
+    if (!formData.name || !formData.description || !formData.code || !formData.capability || !formData.charge) {
       alert('Please fill in all fields');
       return;
     }
@@ -145,6 +147,7 @@ export default function AgentRegistrationForm() {
         description: formData.description,
         code: codeUrl,
         charge: formData.charge,
+        capability: formData.capability,
         version: '1.0.0',
         author: publicKey.toString(),
         agentId: agentId,
@@ -172,6 +175,7 @@ export default function AgentRegistrationForm() {
         description: '',
         code: '',
         charge: '',
+        capability:'',
       });
       
     } catch (error) {
@@ -277,6 +281,24 @@ export default function AgentRegistrationForm() {
           />
           <p className="text-sm text-gray-500 mt-1">
             Amount in USDC that users will pay per agent call
+          </p>
+        </div>
+        <div>
+          <label htmlFor="capability" className="block text-sm font-medium text-gray-700 mb-2">
+            Capability
+          </label>
+          <input
+            type="text"
+            id="capability"
+            name="capability"
+            value={formData.capability}
+            onChange={handleInputChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-black placeholder-gray-500"
+            placeholder="Enter capability"
+            required
+          />
+          <p className="text-sm text-gray-500 mt-1">
+            Enter the capability of the agent
           </p>
         </div>
 
