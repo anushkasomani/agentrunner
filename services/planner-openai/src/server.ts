@@ -71,7 +71,7 @@ You are a planning engine for DeFi agents. Output ONLY JSON matching this schema
 "steps": [
 {
 "type": "rfp" | "skill",
-"capability": "swap.sol" | "rebalance" | "lp.manage" | "liquidate" | "report.publish",
+"capability": "swap" | "rebalance" | "lp_manage" | "liquidate" | "report_publish" | "other",
 "name": "rebalance" | "swap" | "add_liquidity" | "remove_liquidity" | "report_publish",
 "inputs": {},
 "constraints": {"slippage_bps_max": number, "freshness_s": number},
