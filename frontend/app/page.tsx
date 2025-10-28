@@ -1,123 +1,249 @@
 'use client';
 
-import { WalletMultiButton, WalletDisconnectButton } from './components/WalletProvider';
 import AgentRegistrationForm from './components/AgentRegistrationForm';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { Bot, Wallet } from 'lucide-react';
+import { Bot, Wallet, Zap, Shield, Globe, ArrowRight, Star, Users, Activity } from 'lucide-react';
 
 export default function Home() {
   const { connected } = useWallet();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <Bot className="w-8 h-8 text-blue-600" />
-              <h1 className="text-xl font-bold text-gray-900">AgentRunner</h1>
+    <div className="min-h-screen">
+
+      {/* Hero Section */}
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-pink-600/10"></div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+          <div className="text-center">
+            <div className="inline-flex items-center px-4 py-2 rounded-full bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200 text-sm font-medium mb-8 animate-fade-in">
+              <Zap className="w-4 h-4 mr-2" />
+              Next-Generation DeFi Automation
             </div>
-            <div className="flex items-center space-x-4">
+            
+            <h1 className="text-5xl md:text-6xl font-bold text-gray-900 dark:text-white mb-6 animate-slide-up">
+              Deploy AI Agents on
+              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"> Solana</span>
+            </h1>
+            
+            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-8 animate-slide-up">
+              Create, deploy, and manage intelligent DeFi agents that execute complex strategies automatically. 
+              Built on Solana for lightning-fast transactions and minimal fees.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12 animate-scale-in">
               <a
                 href="/chat"
-                className="px-4 py-2 text-gray-700 hover:text-blue-600 transition-colors font-medium"
+                className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
               >
-                Chat
+                Start Building
+                <ArrowRight className="w-5 h-5 ml-2" />
               </a>
-              <WalletMultiButton 
-                className="!bg-blue-600 hover:!bg-blue-700 !rounded-lg !px-6 !py-2 !text-white !font-semibold"
-                style={{ 
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: 'white',
-                  fontWeight: '600'
-                }}
-              />
-              {connected && <WalletDisconnectButton />}
+              <a
+                href="/agents"
+                className="inline-flex items-center px-8 py-4 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-semibold rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+              >
+                <Users className="w-5 h-5 mr-2" />
+                Browse Agents
+              </a>
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto animate-fade-in">
+              <div className="text-center">
+                <div className="text-3xl font-bold text-gray-900 dark:text-white mb-2">24+</div>
+                <div className="text-gray-600 dark:text-gray-400">Active Agents</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-gray-900 dark:text-white mb-2">1,247</div>
+                <div className="text-gray-600 dark:text-gray-400">Transactions</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-gray-900 dark:text-white mb-2">94.2%</div>
+                <div className="text-gray-600 dark:text-gray-400">Success Rate</div>
+              </div>
             </div>
           </div>
         </div>
-      </header>
+      </section>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold text-gray-900 mb-4">
-            Deploy Your Solana Agent
-          </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Connect your Solana wallet and deploy your agent code to IPFS. 
-            Your agent will be registered on-chain and ready to execute tasks.
-          </p>
+      {/* Agent Registration Section */}
+      <section className="py-20 bg-white dark:bg-gray-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+              Deploy Your Agent
+            </h2>
+            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+              Connect your Solana wallet and deploy your agent code to IPFS. 
+              Your agent will be registered on-chain and ready to execute tasks.
+            </p>
+          </div>
+
+          <div className="flex justify-center">
+            {connected ? (
+              <div className="w-full max-w-4xl animate-scale-in">
+                <AgentRegistrationForm />
+              </div>
+            ) : (
+              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-12 text-center max-w-md animate-scale-in border border-gray-200 dark:border-gray-700">
+                <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <Wallet className="w-10 h-10 text-white" />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                  Connect Your Wallet
+                </h3>
+                <p className="text-gray-600 dark:text-gray-300 mb-8">
+                  Please connect your Solana wallet to start deploying agents and accessing the full platform.
+                </p>
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  Supported wallets: Phantom, Solflare, Torus, and more
+                </div>
+              </div>
+            )}
+          </div>
         </div>
+      </section>
 
-        <div className="flex justify-center">
-          {connected ? (
-            <AgentRegistrationForm />
-          ) : (
-            <div className="bg-white rounded-lg shadow-lg p-8 text-center">
-              <Wallet className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                Connect Your Wallet
+      {/* Features Section */}
+      <section className="py-20 bg-gray-50 dark:bg-gray-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+              Why Choose AgentRunner?
+            </h2>
+            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+              Built for the future of DeFi with cutting-edge technology and user-friendly design.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-200 dark:border-gray-700 group">
+              <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-200">
+                <Wallet className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+                Multi-Wallet Support
               </h3>
-              <p className="text-gray-600 mb-6">
-                Please connect your Solana wallet to start deploying agents.
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
+                Connect with Phantom, Solflare, Torus, and other popular Solana wallets seamlessly.
               </p>
-              <WalletMultiButton 
-                className="!bg-blue-600 hover:!bg-blue-700 !rounded-lg !px-6 !py-2 !text-white !font-semibold"
-                style={{ 
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: 'white',
-                  fontWeight: '600'
-                }}
-              />
+              <div className="flex items-center text-blue-600 dark:text-blue-400 font-medium">
+                <span className="text-sm">Learn more</span>
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </div>
             </div>
-          )}
+
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-200 dark:border-gray-700 group">
+              <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-green-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-200">
+                <Bot className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+                IPFS Integration
+              </h3>
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
+                Upload your agent code and metadata to IPFS for decentralized, permanent storage.
+              </p>
+              <div className="flex items-center text-green-600 dark:text-green-400 font-medium">
+                <span className="text-sm">Learn more</span>
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-200 dark:border-gray-700 group">
+              <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-200">
+                <Shield className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+                On-Chain Registry
+              </h3>
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
+                Register your agent on the Solana blockchain for transparent, verifiable deployment.
+              </p>
+              <div className="flex items-center text-purple-600 dark:text-purple-400 font-medium">
+                <span className="text-sm">Learn more</span>
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-200 dark:border-gray-700 group">
+              <div className="w-16 h-16 bg-gradient-to-r from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-200">
+                <Zap className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+                Lightning Fast
+              </h3>
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
+                Built on Solana for sub-second transaction times and minimal fees.
+              </p>
+              <div className="flex items-center text-orange-600 dark:text-orange-400 font-medium">
+                <span className="text-sm">Learn more</span>
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-200 dark:border-gray-700 group">
+              <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-pink-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-200">
+                <Globe className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+                Decentralized
+              </h3>
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
+                Fully decentralized platform with no single point of failure.
+              </p>
+              <div className="flex items-center text-pink-600 dark:text-pink-400 font-medium">
+                <span className="text-sm">Learn more</span>
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-200 dark:border-gray-700 group">
+              <div className="w-16 h-16 bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-200">
+                <Activity className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+                Real-time Analytics
+              </h3>
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
+                Monitor agent performance with comprehensive analytics and insights.
+              </p>
+              <div className="flex items-center text-indigo-600 dark:text-indigo-400 font-medium">
+                <span className="text-sm">Learn more</span>
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </div>
+            </div>
+          </div>
         </div>
+      </section>
 
-        {/* Features Section */}
-        <div className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="bg-white rounded-lg shadow-md p-6 text-center">
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-              <Wallet className="w-6 h-6 text-blue-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Solana Wallet
-            </h3>
-            <p className="text-gray-600">
-              Connect with Phantom, Solflare, or other Solana wallets
-            </p>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-md p-6 text-center">
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-              <Bot className="w-6 h-6 text-green-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Agent Deployment
-            </h3>
-            <p className="text-gray-600">
-              Upload your agent code and metadata to IPFS
-            </p>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-md p-6 text-center">
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-              <Bot className="w-6 h-6 text-purple-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              On-Chain Registry
-            </h3>
-            <p className="text-gray-600">
-              Register your agent on the Solana blockchain
-            </p>
+      {/* CTA Section */}
+      <section className="py-20 bg-gradient-to-r from-blue-600 to-purple-600">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-4xl font-bold text-white mb-4">
+            Ready to Build the Future of DeFi?
+          </h2>
+          <p className="text-xl text-blue-100 mb-8 max-w-3xl mx-auto">
+            Join thousands of developers building intelligent DeFi agents on Solana. 
+            Start your journey today with our comprehensive platform.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <a
+              href="/chat"
+              className="inline-flex items-center px-8 py-4 bg-white text-blue-600 font-semibold rounded-xl hover:bg-gray-50 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+            >
+              <Zap className="w-5 h-5 mr-2" />
+              Start Building Now
+            </a>
+            <a
+              href="/agents"
+              className="inline-flex items-center px-8 py-4 bg-transparent text-white font-semibold rounded-xl border-2 border-white hover:bg-white hover:text-blue-600 transition-all duration-200"
+            >
+              <Users className="w-5 h-5 mr-2" />
+              Explore Agents
+            </a>
           </div>
         </div>
-      </main>
+      </section>
     </div>
   );
 }
