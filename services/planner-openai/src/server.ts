@@ -3,7 +3,7 @@ import { v4 as uuid } from "uuid";
 import { OpenAI } from "openai";
 import { z } from "zod";
 
-const OPENAI_API_KEY="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"
+const OPENAI_API_KEY=""
 export const GuardConfigSchema = z.object({
   freshness_s: z.number().int().min(1).default(5),
   slippage_bps_max: z.number().int().min(1).default(50),

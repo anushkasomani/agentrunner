@@ -6,7 +6,7 @@ import Composer from '../components/Composer';
 import { WalletMultiButton } from '@/app/components/WalletProvider';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { callPlanner, summarizePlan } from '../services/planner';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, AlertCircle } from 'lucide-react';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -343,90 +343,107 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="chat-page-root">
-      {/* Sticky Top Bar */}
-      <header className="chat-top-bar">
-        <div className="chat-top-bar-content">
-          <div className="chat-logo">
-            <MessageCircle size={24} />
-            <span className="chat-logo-text">AgentRunner</span>
-          </div>
-          <WalletMultiButton
-            className="!bg-blue-600 hover:!bg-blue-700 !rounded-lg !px-6 !py-2 !text-white !font-semibold"
-            style={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              border: 'none',
-              borderRadius: '8px',
-              color: 'white',
-              fontWeight: '600'
-            }}
-          />
-        </div>
-      </header>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
 
       {/* Main Content */}
-      <main className="chat-main-content">
-        <div className="chat-card">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden min-h-[600px] flex flex-col">
+          {/* Chat Header */}
+          <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                  <MessageCircle className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-white">DeFi Agent Chat</h1>
+                  <p className="text-blue-100 text-sm">Ask me anything about DeFi strategies</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-1 text-white">
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                  <span className="text-sm">Online</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Quick Actions */}
           {messages.length === 1 && (
-            <div className="quick-actions-container">
-              {QUICK_ACTIONS.map((action, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => handleQuickAction(action)}
-                  className="quick-action-button"
-                  disabled={loading}
-                  aria-label={`Quick action: ${action}`}
-                >
-                  {action}
-                </button>
-              ))}
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                Quick Actions
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {QUICK_ACTIONS.map((action, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => handleQuickAction(action)}
+                    className="p-4 text-left bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-700 dark:to-gray-600 rounded-xl border border-blue-200 dark:border-gray-600 hover:from-blue-100 hover:to-purple-100 dark:hover:from-gray-600 dark:hover:to-gray-500 transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                    disabled={loading}
+                    aria-label={`Quick action: ${action}`}
+                  >
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                      {action}
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
           {/* Agent Management Buttons */}
-          <div className="agent-buttons-container">
-            {CHAT_BUTTONS.map((button, idx) => (
-              <button
-                key={idx}
-                onClick={button.action}
-                className="agent-button"
-                disabled={loading}
-                aria-label={button.label}
-              >
-                <span className="agent-button-icon">{button.icon}</span>
-                <span className="agent-button-label">{button.label}</span>
-              </button>
-            ))}
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+            <div className="flex flex-wrap gap-3">
+              {CHAT_BUTTONS.map((button, idx) => (
+                <button
+                  key={idx}
+                  onClick={button.action}
+                  className="flex items-center space-x-2 px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-blue-300 dark:hover:border-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={loading}
+                  aria-label={button.label}
+                >
+                  <span className="text-lg">{button.icon}</span>
+                  <span className="text-sm font-medium">{button.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Chat Feed */}
           <ChatFeed messages={messages} isLoading={loading} />
 
-          {/* Wallet Hint */}
+          {/* Wallet Status */}
           {!publicKey && (
-            <div className="wallet-hint-banner">
-              <p>
-                You&apos;re not connected. Planning works; execution requires a
-                wallet.
-              </p>
+            <div className="px-6 py-4 bg-yellow-50 dark:bg-yellow-900/20 border-t border-yellow-200 dark:border-yellow-800">
+              <div className="flex items-center space-x-2 text-yellow-800 dark:text-yellow-200">
+                <AlertCircle className="w-5 h-5" />
+                <p className="text-sm font-medium">
+                  You&apos;re not connected. Planning works; execution requires a wallet.
+                </p>
+              </div>
             </div>
           )}
 
           {publicKey && (
-            <div className="wallet-ready-badge">
-              <div className="wallet-ready-dot" />
-              <span>Ready to execute</span>
+            <div className="px-6 py-4 bg-green-50 dark:bg-green-900/20 border-t border-green-200 dark:border-green-800">
+              <div className="flex items-center space-x-2 text-green-800 dark:text-green-200">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <p className="text-sm font-medium">Ready to execute transactions</p>
+              </div>
             </div>
           )}
 
           {/* Composer */}
-          <Composer
-            onSend={handleSend}
-            isLoading={loading}
-            budget={budget}
-            onBudgetChange={setBudget}
-          />
+          <div className="mt-auto">
+            <Composer
+              onSend={handleSend}
+              isLoading={loading}
+              budget={budget}
+              onBudgetChange={setBudget}
+            />
+          </div>
         </div>
       </main>
 
