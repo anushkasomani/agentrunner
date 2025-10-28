@@ -3,7 +3,7 @@ import { v4 as uuid } from "uuid";
 import { OpenAI } from "openai";
 import { z } from "zod";
 
-const OPENAI_API_KEY=""
+const OPENAI_API_KEY="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"
 export const GuardConfigSchema = z.object({
   freshness_s: z.number().int().min(1).default(5),
   slippage_bps_max: z.number().int().min(1).default(50),
@@ -71,7 +71,7 @@ You are a planning engine for DeFi agents and API services. Output ONLY JSON mat
 "steps": [
 {
 "type": "rfp" | "skill" | "api-service",
-"capability": "swap" | "rebalance" | "lp_manage" | "liquidate" | "report_publish" | "data-provider" | "analytics" | "ohlcv-data" | "market-data" | "other",
+"capability": "swap" |"sip" | "rebalance" | "lp_manage" | "liquidate" | "report_publish" | "data-provider" | "analytics" | "ohlcv-data" | "market-data" | "other",
 "name": "rebalance" | "swap" | "add_liquidity" | "remove_liquidity" | "report_publish" | "llm_call" | "api_call",
 "inputs": {},
 "constraints": {"slippage_bps_max": number, "freshness_s": number},
