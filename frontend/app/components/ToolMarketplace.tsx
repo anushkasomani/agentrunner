@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, ExternalLink, DollarSign, Zap, Globe, Code, Database, TrendingUp } from 'lucide-react';
+import { Search, ExternalLink, DollarSign, Zap, Globe, Code, Database, TrendingUp, RefreshCw } from 'lucide-react';
 
 interface Tool {
   id: string;
@@ -36,72 +36,124 @@ export default function ToolMarketplace({ onToolSelect, selectedTools, onClose }
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [tools, setTools] = useState<Tool[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Mock data - in real implementation, this would come from your API
+  // Fetch real API services from the agents endpoint
+  const fetchTools = async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+        
+        // Fetch agents from the API
+        const response = await fetch('/api/agents');
+        const data = await response.json();
+        
+        if (data.ok && data.agents) {
+          // Transform agents into tools format
+          const apiTools: Tool[] = data.agents
+            .filter((agent: any) => agent.serviceType === 'api' || agent.service_type === 'api')
+            .map((agent: any) => {
+              // Parse service_store for API configuration
+              let serviceConfig = {};
+              try {
+                if (agent.service_store) {
+                  serviceConfig = JSON.parse(agent.service_store);
+                }
+              } catch (e) {
+                console.warn('Failed to parse service_store for agent:', agent.name);
+              }
+
+              // Map capability to category
+              const getCategory = (capability: string) => {
+                if (capability.includes('data') || capability.includes('ohlcv') || capability.includes('price')) return 'data';
+                if (capability.includes('trading') || capability.includes('arbitrage')) return 'trading';
+                if (capability.includes('ai') || capability.includes('analytics')) return 'ai';
+                return 'utility';
+              };
+
+              // Get icon based on capability
+              const getIcon = (capability: string) => {
+                if (capability.includes('ohlcv') || capability.includes('data')) return '📊';
+                if (capability.includes('trading')) return '💰';
+                if (capability.includes('ai') || capability.includes('analytics')) return '🧠';
+                if (capability.includes('search')) return '🔍';
+                return '🔧';
+              };
+
+              return {
+                id: agent.agentPda || agent.agentId,
+                name: agent.name,
+                description: agent.description,
+                endpoint: serviceConfig.endpoint || 'N/A',
+                method: serviceConfig.method || 'GET',
+                price: parseFloat(agent.charge || '0'),
+                usage: Math.floor(Math.random() * 500) + 50, // Mock usage data
+                category: getCategory(agent.capability || 'utility'),
+                icon: getIcon(agent.capability || 'utility'),
+                headers: serviceConfig.headers || {},
+                body: serviceConfig.body || null,
+              };
+            });
+
+          setTools(apiTools);
+        } else {
+          // Fallback to mock data if API fails
+          const mockTools: Tool[] = [
+            {
+              id: 'crypto-ohlcv-api',
+              name: 'Crypto OHLCV API',
+              description: 'Get cryptocurrency OHLCV data from CoinGecko API with multiple timeframes and currencies.',
+              endpoint: 'https://ohlcv-data.onrender.com/ohlcv',
+              method: 'GET',
+              price: 0.01,
+              usage: 150,
+              category: 'data',
+              icon: '📊',
+              headers: {
+                'Authorization': 'Bearer crypto-ohlcv-secret-key-2024',
+                'Content-Type': 'application/json'
+              }
+            },
+            {
+              id: '1',
+              name: 'Financial Data API',
+              description: 'Get real-time financial market data including crypto, stocks, and forex prices.',
+              endpoint: 'https://financial-agent.daydreams.systems/entrypoint',
+              method: 'GET',
+              price: 0.07,
+              usage: 286,
+              category: 'data',
+              icon: '📊',
+            },
+            {
+              id: '2',
+              name: 'Firecrawl Search',
+              description: 'The search endpoint combines web search (SERP) with Firecrawl\'s scraping capabilities to return full page content for any query.',
+              endpoint: 'https://api.firecrawl.dev/v2/x402/search',
+              method: 'POST',
+              price: 0.01,
+              usage: 273,
+              category: 'utility',
+              icon: '🔥',
+            },
+          ];
+          setTools(mockTools);
+        }
+      } catch (error) {
+        console.error('Error fetching tools:', error);
+        // Fallback to empty array on error
+        setTools([]);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    };
+
   useEffect(() => {
-    const mockTools: Tool[] = [
-      {
-        id: '1',
-        name: 'Financial Data API',
-        description: 'Get real-time financial market data including crypto, stocks, and forex prices.',
-        endpoint: 'https://financial-agent.daydreams.systems/entrypoint',
-        method: 'GET',
-        price: 0.07,
-        usage: 286,
-        category: 'data',
-        icon: '📊',
-      },
-      {
-        id: '2',
-        name: 'Firecrawl Search',
-        description: 'The search endpoint combines web search (SERP) with Firecrawl\'s scraping capabilities to return full page content for any query.',
-        endpoint: 'https://api.firecrawl.dev/v2/x402/search',
-        method: 'POST',
-        price: 0.01,
-        usage: 273,
-        category: 'utility',
-        icon: '🔥',
-      },
-      {
-        id: '3',
-        name: 'Tavily Extractor',
-        description: 'Extracts structured content from web pages using Tavily. Cleans and processes raw HTML into readable, structured text data.',
-        endpoint: 'https://echo.router.merit.systems/resource/tavily/exti',
-        method: 'POST',
-        price: 0.00,
-        usage: 212,
-        category: 'utility',
-        icon: '🔷',
-      },
-      {
-        id: '4',
-        name: 'Ainalyst API',
-        description: 'Touch the data - Advanced analytics and data processing API.',
-        endpoint: 'https://ainalyst-api.xyz/touch',
-        method: 'POST',
-        price: 1.00,
-        usage: 177,
-        category: 'ai',
-        icon: '🧠',
-      },
-      {
-        id: '5',
-        name: 'DeFi Price Oracle',
-        description: 'Get accurate DeFi token prices and liquidity data for trading decisions.',
-        endpoint: 'https://oracle.defi.com/prices',
-        method: 'GET',
-        price: 0.05,
-        usage: 145,
-        category: 'trading',
-        icon: '💰',
-      },
-    ];
-
-    // Simulate API call
-    setTimeout(() => {
-      setTools(mockTools);
-      setLoading(false);
-    }, 1000);
+    fetchTools();
   }, []);
 
   const filteredTools = tools.filter(tool => {
@@ -145,12 +197,22 @@ export default function ToolMarketplace({ onToolSelect, selectedTools, onClose }
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Search Tools</h2>
-            <button
-              onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-            >
-              ✕
-            </button>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => fetchTools(true)}
+                disabled={refreshing}
+                className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 disabled:opacity-50"
+                title="Refresh tools"
+              >
+                <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+              </button>
+              <button
+                onClick={onClose}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                ✕
+              </button>
+            </div>
           </div>
 
           {/* Search Bar */}

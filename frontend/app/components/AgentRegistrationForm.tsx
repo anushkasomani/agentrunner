@@ -19,6 +19,8 @@ interface AgentFormData {
   apiHeaders?: string;
   apiBody?: string;
   perCallPrice?: string;
+  apiInputParams?: string;
+  apiQueryParams?: string;
 }
 
 const PROGRAM_ID = new PublicKey("HXGQvWagr4soQviA3Lr9LPzVw5G1EmstnaivhYE3BCHK");
@@ -38,6 +40,8 @@ export default function AgentRegistrationForm() {
     apiHeaders: '',
     apiBody: '',
     perCallPrice: '0.01',
+    apiInputParams: '',
+    apiQueryParams: '',
   });
   const [isUploading, setIsUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<{
@@ -134,9 +138,23 @@ export default function AgentRegistrationForm() {
       return;
     }
 
-    if (!formData.name || !formData.description || !formData.code || !formData.capability || !formData.charge) {
-      alert('Please fill in all fields');
+    // Validate common fields
+    if (!formData.name || !formData.description || !formData.capability) {
+      alert('Please fill in name, description, and capability');
       return;
+    }
+
+    // Validate based on service type
+    if (formData.serviceType === 'agent') {
+      if (!formData.code || !formData.charge) {
+        alert('Please fill in agent code and charge amount');
+        return;
+      }
+    } else if (formData.serviceType === 'api') {
+      if (!formData.apiEndpoint || !formData.perCallPrice) {
+        alert('Please fill in API endpoint and per-call price');
+        return;
+      }
     }
 
     setIsUploading(true);
@@ -158,8 +176,47 @@ export default function AgentRegistrationForm() {
         PROGRAM_ID
       );
       
-      //upload code 
-      const codeUrl = await ipfsService.uploadCode(formData.code, `${formData.name}.py`);
+      // Parse API configuration for both upload and metadata
+      let headers = {};
+      let body = null;
+      
+      if (formData.serviceType === 'api') {
+        try {
+          if (formData.apiHeaders) {
+            headers = JSON.parse(formData.apiHeaders);
+          }
+        } catch (e) {
+          throw new Error('Invalid JSON in API headers. Please check the format.');
+        }
+        
+        try {
+          if (formData.apiBody) {
+            body = JSON.parse(formData.apiBody);
+          }
+        } catch (e) {
+          throw new Error('Invalid JSON in API body. Please check the format.');
+        }
+      }
+
+      // Upload code or API configuration based on service type
+      let codeUrl = '';
+      if (formData.serviceType === 'agent') {
+        codeUrl = await ipfsService.uploadCode(formData.code, `${formData.name}.py`);
+      } else {
+        // For API services, create a configuration file
+        const apiConfig = {
+          endpoint: formData.apiEndpoint,
+          method: formData.apiMethod,
+          headers,
+          body,
+          inputParams: formData.apiInputParams ? JSON.parse(formData.apiInputParams) : {},
+          queryParams: formData.apiQueryParams ? JSON.parse(formData.apiQueryParams) : {},
+        };
+        codeUrl = await ipfsService.uploadCode(
+          JSON.stringify(apiConfig, null, 2), 
+          `${formData.name}-config.json`
+        );
+      }
 
       // Upload metadata with pre-determined agentPda
       const metadata = {
@@ -172,14 +229,24 @@ export default function AgentRegistrationForm() {
         service_store: formData.serviceType === 'api' ? JSON.stringify({
           endpoint: formData.apiEndpoint,
           method: formData.apiMethod,
-          headers: formData.apiHeaders ? JSON.parse(formData.apiHeaders) : {},
-          body: formData.apiBody ? JSON.parse(formData.apiBody) : null,
+          headers,
+          body,
+          inputParams: formData.apiInputParams ? JSON.parse(formData.apiInputParams) : {},
+          queryParams: formData.apiQueryParams ? JSON.parse(formData.apiQueryParams) : {},
         }) : '',
         version: '1.0.0',
         author: publicKey.toString(),
         agentId: agentId,
         agentPda: agentPda.toString(), 
         timestamp: Date.now(),
+        // Add service-specific metadata
+        ...(formData.serviceType === 'agent' ? {
+          code_language: 'python',
+          execution_type: 'agent'
+        } : {
+          api_type: 'rest',
+          execution_type: 'api_service'
+        })
       };
       
       const metadataUrl = await ipfsService.uploadAgentMetadata(metadata);
@@ -209,6 +276,8 @@ export default function AgentRegistrationForm() {
         apiHeaders: '',
         apiBody: '',
         perCallPrice: '0.01',
+        apiInputParams: '',
+        apiQueryParams: '',
       });
       
     } catch (error) {
@@ -470,63 +539,108 @@ export default function AgentRegistrationForm() {
                   />
                 </div>
               )}
+
+              {/* API Input Parameters */}
+              <div className="space-y-2">
+                <label htmlFor="apiInputParams" className="block text-sm font-semibold text-gray-900 dark:text-white">
+                  Input Parameters (JSON Schema)
+                </label>
+                <textarea
+                  id="apiInputParams"
+                  name="apiInputParams"
+                  value={formData.apiInputParams}
+                  onChange={handleInputChange}
+                  rows={4}
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 bg-gray-50 dark:bg-gray-900 transition-all duration-200 resize-none"
+                  placeholder='{"symbol": "string", "timeframe": "string", "vs_currency": "string"}'
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Define the input parameters your API expects (for planner to build correct inputs)
+                </p>
+              </div>
+
+              {/* API Query Parameters */}
+              <div className="space-y-2">
+                <label htmlFor="apiQueryParams" className="block text-sm font-semibold text-gray-900 dark:text-white">
+                  Query Parameters (JSON Schema)
+                </label>
+                <textarea
+                  id="apiQueryParams"
+                  name="apiQueryParams"
+                  value={formData.apiQueryParams}
+                  onChange={handleInputChange}
+                  rows={4}
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 bg-gray-50 dark:bg-gray-900 transition-all duration-200 resize-none"
+                  placeholder='{"symbol": "string", "timeframe": "string", "vs_currency": "string"}'
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Define the query parameters your API expects (for GET requests)
+                </p>
+              </div>
             </div>
           )}
 
-          {/* Charge and Capability Row - Only show for agent type */}
-          {formData.serviceType === 'agent' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label htmlFor="charge" className="block text-sm font-semibold text-gray-900 dark:text-white">
-                Charge per Call (USDC)
-              </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  id="charge"
-                  name="charge"
-                  value={formData.charge}
-                  onChange={handleInputChange}
-                  step="0.001"
-                  min="0"
-                  className="w-full px-4 py-3 pl-8 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 bg-white dark:bg-gray-700 transition-all duration-200"
-                  placeholder="0.001"
-                  required
-                />
-                <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400">
-                  $
-                </div>
-              </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Amount users pay per agent execution
-              </p>
-            </div>
+          {/* Capability - Show for both agent and API types */}
+          <div className="space-y-2">
+            <label htmlFor="capability" className="block text-sm font-semibold text-gray-900 dark:text-white">
+              Capability
+            </label>
+            <select
+              id="capability"
+              name="capability"
+              value={formData.capability}
+              onChange={handleSelectChange}
+              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white bg-white dark:bg-gray-700 transition-all duration-200"
+              required
+            >
+              <option value="">Select capability</option>
+              <option value="trading">Trading</option>
+              <option value="arbitrage">Arbitrage</option>
+              <option value="yield-farming">Yield Farming</option>
+              <option value="liquidity-management">Liquidity Management</option>
+              <option value="portfolio-rebalancing">Portfolio Rebalancing</option>
+              <option value="risk-management">Risk Management</option>
+              <option value="data-provider">Data Provider</option>
+              <option value="price-feed">Price Feed</option>
+              <option value="analytics">Analytics</option>
+              <option value="ohlcv-data">OHLCV Data</option>
+              <option value="market-data">Market Data</option>
+              <option value="other">Other</option>
+            </select>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {formData.serviceType === 'agent' 
+                ? 'What your agent specializes in' 
+                : 'What type of service your API provides'
+              }
+            </p>
+          </div>
 
-            <div className="space-y-2">
-              <label htmlFor="capability" className="block text-sm font-semibold text-gray-900 dark:text-white">
-                Capability
-              </label>
-              <select
-                id="capability"
-                name="capability"
-                value={formData.capability}
-                onChange={handleSelectChange}
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white bg-white dark:bg-gray-700 transition-all duration-200"
+          {/* Charge/Price - Show based on service type */}
+          {formData.serviceType === 'agent' && (
+          <div className="space-y-2">
+            <label htmlFor="charge" className="block text-sm font-semibold text-gray-900 dark:text-white">
+              Charge per Call (USDC)
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                id="charge"
+                name="charge"
+                value={formData.charge}
+                onChange={handleInputChange}
+                step="0.001"
+                min="0"
+                className="w-full px-4 py-3 pl-8 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 bg-white dark:bg-gray-700 transition-all duration-200"
+                placeholder="0.001"
                 required
-              >
-                <option value="">Select capability</option>
-                <option value="trading">Trading</option>
-                <option value="arbitrage">Arbitrage</option>
-                <option value="yield-farming">Yield Farming</option>
-                <option value="liquidity-management">Liquidity Management</option>
-                <option value="portfolio-rebalancing">Portfolio Rebalancing</option>
-                <option value="risk-management">Risk Management</option>
-                <option value="other">Other</option>
-              </select>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                What your agent specializes in
-              </p>
+              />
+              <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400">
+                $
+              </div>
             </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Amount users pay per agent execution
+            </p>
           </div>
           )}
 

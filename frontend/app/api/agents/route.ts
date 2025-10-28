@@ -59,6 +59,10 @@ export async function GET() {
             capability: metadata.capability || "generic",
             charge: metadata.charge || "0.1",
             codeUrl: metadata.codeUrl || '#',
+            serviceType: metadata.service_type || 'agent',
+            service_store: metadata.service_store || '',
+            version: metadata.version || '1.0.0',
+            execution_type: metadata.execution_type || 'agent',
           };
         } catch (error) {
           console.error(`Failed to process agent ${agentEntry.publicKey.toString()}:`, error);
