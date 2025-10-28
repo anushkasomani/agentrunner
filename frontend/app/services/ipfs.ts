@@ -26,6 +26,8 @@ interface APIServiceConfig {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   headers: Record<string, string>;
   body: any;
+  inputParams: Record<string, any>;
+  queryParams: Record<string, any>;
 }
 
 
@@ -207,6 +209,8 @@ export class IPFSService {
       icon: this.getCategoryIcon(metadata.capability),
       headers: apiConfig.headers,
       body: apiConfig.body,
+      inputParams: apiConfig.inputParams,
+      queryParams: apiConfig.queryParams,
     };
   }
 
