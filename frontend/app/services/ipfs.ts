@@ -10,6 +10,8 @@ interface AgentMetadata {
   name: string;
   description: string;
   code: string;
+  service_type: 'agent' | 'api';
+  service_store: string;
   charge: string;
   capability: string;
   version: string;
@@ -17,6 +19,13 @@ interface AgentMetadata {
   agentId: string;
   agentPda: string; 
   timestamp: number;
+}
+
+interface APIServiceConfig {
+  endpoint: string;
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  headers: Record<string, string>;
+  body: any;
 }
 
 
@@ -98,6 +107,126 @@ export class IPFSService {
       console.error('Error uploading code to IPFS:', error);
       throw new Error('Failed to upload agent code to IPFS');
     }
+  }
+
+  /**
+   * Parse API service configuration from service_store string
+   */
+  parseAPIServiceConfig(serviceStore: string): APIServiceConfig | null {
+    try {
+      if (!serviceStore || serviceStore.trim() === '') {
+        return null;
+      }
+      return JSON.parse(serviceStore);
+    } catch (error) {
+      console.error('Error parsing API service config:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Validate API service configuration
+   */
+  validateAPIServiceConfig(config: APIServiceConfig): boolean {
+    if (!config.endpoint || !config.method) {
+      return false;
+    }
+    
+    // Basic URL validation
+    try {
+      new URL(config.endpoint);
+    } catch {
+      return false;
+    }
+
+    // Validate HTTP method
+    const validMethods = ['GET', 'POST', 'PUT', 'DELETE'];
+    if (!validMethods.includes(config.method)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Get service type from metadata
+   */
+  getServiceType(metadata: AgentMetadata): 'agent' | 'api' {
+    return metadata.service_type || 'agent';
+  }
+
+  /**
+   * Check if metadata represents an API service
+   */
+  isAPIService(metadata: AgentMetadata): boolean {
+    return this.getServiceType(metadata) === 'api';
+  }
+
+  /**
+   * Get API service configuration from metadata
+   */
+  getAPIServiceConfig(metadata: AgentMetadata): APIServiceConfig | null {
+    if (!this.isAPIService(metadata)) {
+      return null;
+    }
+    return this.parseAPIServiceConfig(metadata.service_store);
+  }
+
+  /**
+   * Fetch and parse agent metadata from IPFS URL
+   */
+  async fetchAgentMetadata(metadataUrl: string): Promise<AgentMetadata | null> {
+    try {
+      const response = await axios.get(metadataUrl);
+      return response.data as AgentMetadata;
+    } catch (error) {
+      console.error('Error fetching agent metadata:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Convert agent metadata to tool format for marketplace
+   */
+  metadataToTool(metadata: AgentMetadata): any {
+    const apiConfig = this.getAPIServiceConfig(metadata);
+    
+    if (!this.isAPIService(metadata) || !apiConfig) {
+      return null; // Not an API service
+    }
+
+    return {
+      id: metadata.agentId,
+      name: metadata.name,
+      description: metadata.description,
+      endpoint: apiConfig.endpoint,
+      method: apiConfig.method,
+      price: parseFloat(metadata.charge),
+      usage: 0, // This would come from analytics
+      category: metadata.capability,
+      icon: this.getCategoryIcon(metadata.capability),
+      headers: apiConfig.headers,
+      body: apiConfig.body,
+    };
+  }
+
+  /**
+   * Get icon for capability category
+   */
+  private getCategoryIcon(capability: string): string {
+    const iconMap: Record<string, string> = {
+      'trading': '💰',
+      'arbitrage': '⚡',
+      'yield-farming': '🌾',
+      'liquidity-management': '💧',
+      'portfolio-rebalancing': '⚖️',
+      'risk-management': '🛡️',
+      'data': '📊',
+      'ai': '🧠',
+      'utility': '🔧',
+      'other': '🔮',
+    };
+    return iconMap[capability] || '🔮';
   }
 
 }

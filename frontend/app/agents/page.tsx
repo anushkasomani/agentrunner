@@ -7,6 +7,7 @@ import { Connection } from '@solana/web3.js';
 import { clusterApiUrl } from '@solana/web3.js';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import ClientOnlyWalletButton from '../components/ClientOnlyWalletButton';
+import { IPFSService } from '../services/ipfs';
 
 // This interface matches your UI's needs
 interface Agent {
@@ -18,6 +19,11 @@ interface Agent {
   description: string;  // Fetched from metadata JSON
   author: string;       // Mapped from on-chain 'owner'
   timestamp: number;    // Mapped from on-chain 'createdAt'
+  serviceType: 'agent' | 'api'; // New field for service type
+  charge: string;       // Price per call
+  capability: string;    // Service capability/category
+  apiEndpoint?: string; // For API services
+  apiMethod?: string;   // For API services
 }
 
 export default function AgentsPage() {
@@ -80,12 +86,16 @@ export default function AgentsPage() {
         try {
           const onChainAccount = agentEntry.account;
           
-          // Fetch the external JSON metadata
-          const response = await fetch(onChainAccount.metadataUri);
-          if (!response.ok) {
+          // Fetch the external JSON metadata using IPFS service
+          const ipfsService = new IPFSService();
+          const metadata = await ipfsService.fetchAgentMetadata(onChainAccount.metadataUri);
+          
+          if (!metadata) {
             throw new Error(`Failed to fetch metadata from ${onChainAccount.metadataUri}`);
           }
-          const metadata = await response.json();
+
+          // Get API service configuration if it's an API service
+          const apiConfig = ipfsService.getAPIServiceConfig(metadata);
 
           // 4. Combine on-chain data and metadata JSON data
           return {
@@ -99,7 +109,12 @@ export default function AgentsPage() {
             // --- From Fetched Metadata JSON ---
             name: metadata.name,
             description: metadata.description,
-            codeUrl: metadata.codeUrl || '#', // Use '#' as fallback if codeUrl isn't in JSON
+            codeUrl: metadata.code || '#', // Use metadata.code as codeUrl
+            serviceType: metadata.service_type || 'agent',
+            charge: metadata.charge || '0',
+            capability: metadata.capability || 'other',
+            apiEndpoint: apiConfig?.endpoint,
+            apiMethod: apiConfig?.method,
           } as Agent;
 
         } catch (e) {
@@ -263,8 +278,16 @@ export default function AgentsPage() {
                 <div className="p-6 pb-4">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center space-x-4">
-                      <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-                        <Bot className="w-8 h-8 text-white" />
+                      <div className={`w-16 h-16 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-200 ${
+                        agent.serviceType === 'api' 
+                          ? 'bg-gradient-to-r from-purple-500 to-pink-600' 
+                          : 'bg-gradient-to-r from-blue-500 to-purple-600'
+                      }`}>
+                        {agent.serviceType === 'api' ? (
+                          <ExternalLink className="w-8 h-8 text-white" />
+                        ) : (
+                          <Bot className="w-8 h-8 text-white" />
+                        )}
                       </div>
                       <div>
                         <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-1">
@@ -273,6 +296,18 @@ export default function AgentsPage() {
                         <p className="text-sm text-gray-500 dark:text-gray-400 font-mono">
                           {truncateAddress(agent.agentId)}
                         </p>
+                        <div className="flex items-center space-x-2 mt-1">
+                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                            agent.serviceType === 'api'
+                              ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400'
+                              : 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
+                          }`}>
+                            {agent.serviceType === 'api' ? 'API Service' : 'DeFi Agent'}
+                          </span>
+                          <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 rounded-full">
+                            {agent.capability}
+                          </span>
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center space-x-1">
@@ -312,15 +347,44 @@ export default function AgentsPage() {
                       <ExternalLink className="w-4 h-4 mr-2" />
                       Metadata
                     </a>
-                    <a
-                      href={agent.codeUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 flex items-center justify-center px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 text-sm"
-                    >
-                      <Code className="w-4 h-4 mr-2" />
-                      Code
-                    </a>
+                    {agent.serviceType === 'api' ? (
+                      <a
+                        href={agent.apiEndpoint}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 flex items-center justify-center px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 text-sm"
+                      >
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        API Endpoint
+                      </a>
+                    ) : (
+                      <a
+                        href={agent.codeUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 flex items-center justify-center px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 text-sm"
+                      >
+                        <Code className="w-4 h-4 mr-2" />
+                        Code
+                      </a>
+                    )}
+                  </div>
+                  
+                  {/* Pricing Information */}
+                  <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                        Price per call:
+                      </span>
+                      <span className="text-lg font-bold text-green-600 dark:text-green-400">
+                        ${parseFloat(agent.charge).toFixed(3)}
+                      </span>
+                    </div>
+                    {agent.serviceType === 'api' && agent.apiMethod && (
+                      <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        Method: <span className="font-mono font-medium">{agent.apiMethod}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 

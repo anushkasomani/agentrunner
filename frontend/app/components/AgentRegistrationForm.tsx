@@ -13,6 +13,12 @@ interface AgentFormData {
   code: string;
   charge: string;
   capability: string;
+  serviceType: 'agent' | 'api';
+  apiEndpoint?: string;
+  apiMethod?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  apiHeaders?: string;
+  apiBody?: string;
+  perCallPrice?: string;
 }
 
 const PROGRAM_ID = new PublicKey("HXGQvWagr4soQviA3Lr9LPzVw5G1EmstnaivhYE3BCHK");
@@ -26,6 +32,12 @@ export default function AgentRegistrationForm() {
     code: '',
     charge: '',
     capability: '',
+    serviceType: 'agent',
+    apiEndpoint: '',
+    apiMethod: 'GET',
+    apiHeaders: '',
+    apiBody: '',
+    perCallPrice: '0.01',
   });
   const [isUploading, setIsUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<{
@@ -154,8 +166,15 @@ export default function AgentRegistrationForm() {
         name: formData.name,
         description: formData.description,
         code: codeUrl,
-        charge: formData.charge,
+        charge: (formData.serviceType === 'agent' ? formData.charge : formData.perCallPrice) || '0',
         capability: formData.capability,
+        service_type: formData.serviceType,
+        service_store: formData.serviceType === 'api' ? JSON.stringify({
+          endpoint: formData.apiEndpoint,
+          method: formData.apiMethod,
+          headers: formData.apiHeaders ? JSON.parse(formData.apiHeaders) : {},
+          body: formData.apiBody ? JSON.parse(formData.apiBody) : null,
+        }) : '',
         version: '1.0.0',
         author: publicKey.toString(),
         agentId: agentId,
@@ -183,7 +202,13 @@ export default function AgentRegistrationForm() {
         description: '',
         code: '',
         charge: '',
-        capability:'',
+        capability: '',
+        serviceType: 'agent',
+        apiEndpoint: '',
+        apiMethod: 'GET',
+        apiHeaders: '',
+        apiBody: '',
+        perCallPrice: '0.01',
       });
       
     } catch (error) {
@@ -221,7 +246,7 @@ export default function AgentRegistrationForm() {
               Deploy New Agent
             </h2>
             <p className="text-blue-100">
-              Create and register your DeFi agent on Solana
+              Create and register your AI agent on Solana
             </p>
           </div>
         </div>
@@ -290,7 +315,43 @@ export default function AgentRegistrationForm() {
             />
           </div>
 
-          {/* Agent Code */}
+          {/* Service Type */}
+          <div className="space-y-2">
+            <label htmlFor="serviceType" className="block text-sm font-semibold text-gray-900 dark:text-white">
+              Service Type
+            </label>
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, serviceType: 'agent' }))}
+                className={`p-4 rounded-xl border-2 transition-all duration-200 ${
+                  formData.serviceType === 'agent'
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                    : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500'
+                }`}
+              >
+                <Bot className="w-6 h-6 mx-auto mb-2" />
+                <div className="text-sm font-medium">AI Agent</div>
+                <div className="text-xs opacity-75">Executable trading logic</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, serviceType: 'api' }))}
+                className={`p-4 rounded-xl border-2 transition-all duration-200 ${
+                  formData.serviceType === 'api'
+                    ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400'
+                    : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500'
+                }`}
+              >
+                <FileText className="w-6 h-6 mx-auto mb-2" />
+                <div className="text-sm font-medium">API Service</div>
+                <div className="text-xs opacity-75">External API endpoint</div>
+              </button>
+            </div>
+          </div>
+
+          {/* Agent Code - Only show for agent type */}
+          {formData.serviceType === 'agent' && (
           <div className="space-y-2">
             <label htmlFor="code" className="block text-sm font-semibold text-gray-900 dark:text-white">
               Agent Code
@@ -311,8 +372,109 @@ export default function AgentRegistrationForm() {
               </div>
             </div>
           </div>
+          )}
 
-          {/* Charge and Capability Row */}
+          {/* API Configuration - Only show for API type */}
+          {formData.serviceType === 'api' && (
+            <div className="space-y-6">
+              {/* API Endpoint */}
+              <div className="space-y-2">
+                <label htmlFor="apiEndpoint" className="block text-sm font-semibold text-gray-900 dark:text-white">
+                  API Endpoint URL
+                </label>
+                <input
+                  type="url"
+                  id="apiEndpoint"
+                  name="apiEndpoint"
+                  value={formData.apiEndpoint}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 bg-white dark:bg-gray-700 transition-all duration-200"
+                  placeholder="https://api.example.com/v1/data"
+                  required
+                />
+              </div>
+
+              {/* API Method and Headers Row */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label htmlFor="apiMethod" className="block text-sm font-semibold text-gray-900 dark:text-white">
+                    HTTP Method
+                  </label>
+                  <select
+                    id="apiMethod"
+                    name="apiMethod"
+                    value={formData.apiMethod}
+                    onChange={handleSelectChange}
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900 dark:text-white bg-white dark:bg-gray-700 transition-all duration-200"
+                  >
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                    <option value="PUT">PUT</option>
+                    <option value="DELETE">DELETE</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="perCallPrice" className="block text-sm font-semibold text-gray-900 dark:text-white">
+                    Price per Call (USDC)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      id="perCallPrice"
+                      name="perCallPrice"
+                      value={formData.perCallPrice}
+                      onChange={handleInputChange}
+                      step="0.001"
+                      min="0"
+                      className="w-full px-4 py-3 pl-8 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 bg-white dark:bg-gray-700 transition-all duration-200"
+                      placeholder="0.01"
+                      required
+                    />
+                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400">
+                      $
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* API Headers */}
+              <div className="space-y-2">
+                <label htmlFor="apiHeaders" className="block text-sm font-semibold text-gray-900 dark:text-white">
+                  Request Headers (JSON)
+                </label>
+                <textarea
+                  id="apiHeaders"
+                  name="apiHeaders"
+                  value={formData.apiHeaders}
+                  onChange={handleInputChange}
+                  rows={3}
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 bg-gray-50 dark:bg-gray-900 transition-all duration-200 resize-none"
+                  placeholder='{"Authorization": "Bearer YOUR_TOKEN", "Content-Type": "application/json"}'
+                />
+              </div>
+
+              {/* API Body - Only show for POST/PUT */}
+              {(formData.apiMethod === 'POST' || formData.apiMethod === 'PUT') && (
+                <div className="space-y-2">
+                  <label htmlFor="apiBody" className="block text-sm font-semibold text-gray-900 dark:text-white">
+                    Request Body (JSON)
+                  </label>
+                  <textarea
+                    id="apiBody"
+                    name="apiBody"
+                    value={formData.apiBody}
+                    onChange={handleInputChange}
+                    rows={6}
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 bg-gray-50 dark:bg-gray-900 transition-all duration-200 resize-none"
+                    placeholder='{"query": "{{user_input}}", "limit": 10}'
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Charge and Capability Row - Only show for agent type */}
+          {formData.serviceType === 'agent' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <label htmlFor="charge" className="block text-sm font-semibold text-gray-900 dark:text-white">
@@ -366,6 +528,7 @@ export default function AgentRegistrationForm() {
               </p>
             </div>
           </div>
+          )}
 
           {/* Submit Button */}
           <div className="pt-6">
