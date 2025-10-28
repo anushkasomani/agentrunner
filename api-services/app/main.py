@@ -268,8 +268,7 @@ def get_ohlcv(
     response: Response,
     symbol: str = Query(..., description="Symbol or CoinGecko ID (e.g. btc, eth, sol, bitcoin, ethereum)"),
     timeframe: str = Query("1d", description="1d, 7d, 14d, 30d, 90d, 180d, 365d, max"),
-    vs_currency: str = Query("usd", description="Quote currency (usd, eur, etc.)"),
-    token: str = Depends(verify_token)
+    vs_currency: str = Query("usd", description="Quote currency (usd, eur, etc.)")
 ):
     # Check if client has payment proof headers (Flow B)
     invoice_id = request.headers.get("X-402-Invoice")
