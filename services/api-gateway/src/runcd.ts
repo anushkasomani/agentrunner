@@ -61,11 +61,11 @@ async function ensureImage(image: string) {
  * - runs python container with INPUT_JSON
  * - captures logs, tries to parse {decision: "..."}
  */
-export async function runPythonAgent(ohlcv: any) {
+export async function runPythonAgent(ohlcv: any, metadataUri: string) {
   const tmp = await makeTempDir({ unsafeCleanup: true });
   try {
-    console.log("➡️  Fetching metadata:", METADATA_URI);
-    const meta = (await axios.get(METADATA_URI, { timeout: 15_000 })).data;
+    console.log("➡️  Fetching metadata:", metadataUri);
+    const meta = (await axios.get(metadataUri, { timeout: 15_000 })).data;
     if (!meta?.code) throw new Error("metadata missing 'code' field (IPFS URL)");
 
     // 1) Download Python agent

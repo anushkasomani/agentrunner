@@ -1,6 +1,6 @@
 import { makePayment } from "./run.ts";
-
-async function runSip(symbol: string, timeframe: string) {
+import { runPythonAgent } from "./runcd.ts";
+async function runSip(symbol: string, timeframe: string, metadataUri:string) {
     try {
         console.log('Making request to OHLCV API...');
         
@@ -31,6 +31,9 @@ async function runSip(symbol: string, timeframe: string) {
                 console.log('Data fetched successfully');
                 const data = await response2.json();
                 console.log(data);
+                console.log('Running Python Agent...');
+                const pythonAgent = await runPythonAgent(data, metadataUri);
+                console.log('Python Agent result:', pythonAgent);
             } else {
                 console.log('Failed to fetch data');
             }
@@ -42,4 +45,4 @@ async function runSip(symbol: string, timeframe: string) {
     }
 }
 
-runSip("btc", "1d");
+// runSip("btc", "1d");
