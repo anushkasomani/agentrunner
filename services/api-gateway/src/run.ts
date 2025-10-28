@@ -25,7 +25,7 @@ export const PAYER_SECRET_KEY=[94,21,75,106,120,153,168,235,114,39,104,0,255,148
 const PAYER_PRIV = Uint8Array.from(PAYER_SECRET_KEY);
 const PAYER = PAYER_PRIV ? Keypair.fromSecretKey(PAYER_PRIV) : null;
 
-async function makePayment(invoice: string): Promise<any> {
+export async function makePayment(invoice: string): Promise<any> {
     if (!PAYER) {
         throw new Error("PAYER_SECRET_KEY not set");
     }
@@ -95,8 +95,6 @@ async function makePayment(invoice: string): Promise<any> {
         throw new Error(`Payment failed: ${error.message}`);
     }
 }
-
-
 
 app.post('/run', async(req,res)=>{
     // 1. Get invoice
