@@ -6,6 +6,7 @@ export interface PlannerRequest {
       freshness_s: number;
     };
     context?: string;
+    selectedTools?: any[];
   }
   
   export interface PlanStep {
@@ -29,7 +30,8 @@ export interface PlannerRequest {
   
   export async function callPlanner(
     goal: string,
-    budget: number
+    budget: number,
+    selectedTools: any[] = []
   ): Promise<Plan> {
     // Use our Next.js API route as a proxy
     const apiUrl = "/api";
@@ -41,6 +43,7 @@ export interface PlannerRequest {
         slippage_bps_max: 30,
         freshness_s: 5,
       },
+      selectedTools: selectedTools,
     };
   
     try {

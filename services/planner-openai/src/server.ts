@@ -71,7 +71,7 @@ You are a planning engine for DeFi agents and API services. Output ONLY JSON mat
 "steps": [
 {
 "type": "rfp" | "skill" | "api-service",
-"capability": "swap" | "rebalance" | "lp_manage" | "liquidate" | "report_publish" | "data-provider" | "analytics" | "ohlcv-data" | "market-data" | "other",
+"capability": "swap" |"sip" | "rebalance" | "lp_manage" | "liquidate" | "report_publish" | "data-provider" | "analytics" | "ohlcv-data" | "market-data" | "other",
 "name": "rebalance" | "swap" | "add_liquidity" | "remove_liquidity" | "report_publish" | "llm_call" | "api_call",
 "inputs": {},
 "constraints": {"slippage_bps_max": number, "freshness_s": number},
