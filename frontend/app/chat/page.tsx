@@ -1,5 +1,4 @@
 'use client';
-
 import React, { useEffect, useState } from 'react';
 import ChatFeed from '../components/ChatFeed';
 import Composer from '../components/Composer';
@@ -115,6 +114,9 @@ export default function ChatPage() {
     };
     setMessages((prev) => [...prev, userMessage]);
     setLoading(true);
+    const isApiService = (s: any) =>
+      s?.type === 'api-service' || s?.kind === 'api-service' || s?.category === 'api-service';
+    
 
     try {
       // Step 1: Call planner
@@ -148,6 +150,77 @@ export default function ChatPage() {
         loadingState: 'completed'
       };
       setMessages((prev) => [...prev.slice(0, -1), planDetailsMessage]);
+      let data;
+      for (let i = 0; i < (plan.steps?.length || 0); i++) {
+        const step = plan.steps[i];
+        const stepTag = `S${i + 1}`;
+        // If it's an API service step, just leave a placeholder and continue
+  if (isApiService(step)) {
+    try {
+      console.log('Making request to OHLCV API...');
+      const response = await fetch(`http://localhost:8000/ohlcv?symbol=btc&timeframe=$1d`);
+      console.log(response.status)
+      if(response.status === 402) {
+          console.log('Payment required');
+          const body = await response.text();
+          const invoiceData = JSON.parse(body);
+          const invoiceId = invoiceData.id;
+          console.log('Invoice ID:', invoiceId);
+          
+          const payment = await fetch('/api/make-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ invoice: body })
+          }).then(r => {
+            if (!r.ok) throw new Error(`make-payment failed: ${r.status}`);
+            return r.json();
+          });
+          console.log("Payment successful", payment);
+          
+          // Make second request with payment headers
+          const response2 = await fetch(`http://localhost:8000/ohlcv?symbol=btc&timeframe=1d`, {
+              headers: {
+                  'X-402-Invoice': invoiceId,
+                  'X-402-Proof-Tx': payment.txid,
+                  'X-402-Proof-Mint': payment.mint,
+                  'X-402-Chain': payment.chain,
+                  'X-402-Amount': payment.amount.toString()
+              }
+          });
+          console.log(response2.status);
+          if(response2.status === 200) {
+              console.log('Data fetched successfully');
+              data = await response2.json();
+              console.log(data);
+              console.log('Running Python Agent...');
+          } else {
+              console.log('Failed to fetch data');
+          }
+      } else {
+          console.log('Payment successful');
+      }
+  } catch (error) {
+      console.error('Failed to make GET request:', error);
+  }
+    // e.g., await fetch(step.endpoint, { method: step.method, body: JSON.stringify(step.inputs) })
+    console.log(`${stepTag} is api-service; skipping RFP for now`, step);
+
+    setMessages(prev => [
+      ...prev,
+      {
+        role: 'assistant',
+        content:
+          `🧩 **${stepTag} (API Service):** \`${step?.name || step?.capability || 'api-service'}\`\n` +
+          `_TODO: implement direct API call here. Skipping to next step._`,
+        ts: Date.now(),
+        id: `api-svc-skip-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        loadingState: 'completed'
+      }
+    ]);
+    continue;
+  }
+
+
 
       // Step 2: Create RFP
       console.log('📋 Creating RFP...');
@@ -319,6 +392,7 @@ export default function ChatPage() {
 
       setMessages((prev) => [...prev.slice(0, -1), finalMessage]);
       console.log('🎉 Complete execution flow finished successfully!');
+    }
 
     } catch (error) {
       console.error('💥 Execution error:', error);
