@@ -605,6 +605,7 @@ export default function AgentRegistrationForm() {
               <option value="analytics">Analytics</option>
               <option value="ohlcv-data">OHLCV Data</option>
               <option value="market-data">Market Data</option>
+              <option value="sip">SIP</option>
               <option value="other">Other</option>
             </select>
             <p className="text-xs text-gray-500 dark:text-gray-400">

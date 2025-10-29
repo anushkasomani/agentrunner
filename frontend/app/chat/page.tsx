@@ -102,7 +102,7 @@ export default function ChatPage() {
     }
   }, [publicKey, isHydrated]);
 
-  const handleSend = async (text: string, budgetAmount: number) => {
+  const handleSend = async (text: string, budgetAmount: number, selectedTools: any[] = []) => {
     // Guard against double-submit
     if (loading) return;
 
@@ -132,7 +132,8 @@ export default function ChatPage() {
       setMessages((prev) => [...prev, planningMessage]);
 
       console.log('📞 Calling planner service...');
-      const plan = await callPlanner(text, budgetAmount);
+      console.log('🔧 Selected tools:', selectedTools);
+      const plan = await callPlanner(text, budgetAmount, selectedTools);
       console.log('✅ Plan received:', JSON.stringify(plan, null, 2));
       
       const { summary } = summarizePlan(plan);
