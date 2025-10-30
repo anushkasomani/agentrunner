@@ -153,4 +153,32 @@ app.post('/run', async(req,res)=>{
     res.status(runnerResp.status).set(Object.fromEntries(runnerResp.headers)).send(await runnerResp.text());
 });
 
-app.listen(8090, () => console.log("Run service listening on :8090"));
+app.post('/run-swap', async(req,res)=>{
+    const runnerResp = await fetch(`${RUNNER}/run/skill/swap`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(req.body)
+    });
+    
+    if (!runnerResp.ok) {
+        return res.status(runnerResp.status).send(await runnerResp.text());
+    }
+    
+    // 5. Call anchor/daily after successful runner execution
+    try {
+        const anchorResp = await fetch(`${RUNNER}/anchor/daily`, {
+            method: "POST",
+            headers: { "content-type": "application/json" }
+        });
+        
+        const anchorData = await anchorResp.json();
+        console.log("Anchor daily result:", anchorData);
+    } catch (anchorError) {
+        console.error("Anchor daily call failed:", anchorError);
+        // Continue execution even if anchor fails
+    }
+    
+    res.status(runnerResp.status).set(Object.fromEntries(runnerResp.headers)).send(await runnerResp.text());
+});
+
+app.listen(7050, () => console.log("Run service listening on :7050"));

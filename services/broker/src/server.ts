@@ -150,7 +150,8 @@ app.post("/rfp", async (req, res) => {
         const offer = {
           id: `offer_${uuid()}`,
           rfp_id: id,
-          agent_id: v.id,
+          agent_id: v.id, // FK to agents(id)
+          agent_identity: v.agent_pda, // on-chain identity for returning to client
           price_usd: Number(v.charge_usd || 0.1),
           eta_ms: 1500, // Default ETA
           confidence: v.rating,
@@ -159,7 +160,7 @@ app.post("/rfp", async (req, res) => {
 
         await pg.query(
           `insert into offers(id,rfp_id,agent_id,price_usd,eta_ms,confidence,terms) values($1,$2,$3,$4,$5,$6,$7)`,
-          [offer.id, offer.rfp_id, offer.agent_id, offer.price_usd, offer.eta_ms, offer.confidence, offer.terms]
+          [offer.id, offer.rfp_id, v.id, offer.price_usd, offer.eta_ms, offer.confidence, offer.terms]
         );
         
         console.log(`Created offer for agent ${v.name}: $${offer.price_usd}`);
@@ -218,6 +219,9 @@ app.post("/hire", async (req, res) => {
   }
 
   const winner = ranked[0];
+  // fetch the agent record to surface agent_pda as agent_identity
+  const agentRow = await pg.query(`select * from agents where id=$1`, [winner.agent_id]);
+  const agent = agentRow.rows[0] || {};
   
   // Update agent reputation (increase rating on successful hire)
   await pg.query(`
@@ -237,6 +241,7 @@ app.post("/hire", async (req, res) => {
   res.json({
     ok: true,
     hired: {
+      agent_identity: agent.agent_pda || null,
       agent_id: winner.agent_id,
       price_usd: winner.price_usd,
       eta_ms: winner.eta_ms,
