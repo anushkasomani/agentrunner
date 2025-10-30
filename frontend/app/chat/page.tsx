@@ -18,7 +18,7 @@ interface Message {
 
 const INITIAL_MESSAGE: Message = {
   role: 'assistant',
-  content: 'Tell me your DeFi goal…',
+  content: 'Tell me your goal…',
   ts: Date.now(),
   id: 'initial-message'
 };
@@ -143,15 +143,20 @@ export default function ChatPage() {
       console.log('📋 Plan summary:', summary);
 
       // Show plan details first
-      // Compute total cost from plan
+      // Compute total cost and per-step budgets from plan
       let amount_to_pay = 0;
+      const perStepBudgets: string[] = [];
       for (let i = 0; i < (plan.steps?.length || 0); i++) {
-        amount_to_pay += plan.steps[i]?.budget_usd || 0;
+        const s = plan.steps[i] || {} as any;
+        const stepBudget = Number(s?.budget_usd || 0);
+        amount_to_pay += stepBudget;
+        const label = s?.name || s?.capability || s?.type || `step-${i+1}`;
+        perStepBudgets.push(`S${i+1} ${label}: $${stepBudget.toFixed(4)}`);
       }
 
       const planDetailsMessage: Message = {
         role: 'assistant',
-        content: `📋 **Plan Generated!**\n\n${summary}\n\n**Estimated Total Cost:** $${amount_to_pay.toFixed(2)}\n\n**Plan Details:**\n\`\`\`json\n${JSON.stringify(plan, null, 2)}\n\`\`\`\n\n🎯 **Next:** Creating RFP for agent hiring...`,
+        content: `📋 **Plan Generated!**\n\n${summary}\n\n**Estimated Total Cost:** $${amount_to_pay.toFixed(4)}\n\n**Per-Step Budgets:**\n- ${perStepBudgets.join('\n- ')}\n\n**Plan Details:**\n\`\`\`json\n${JSON.stringify(plan, null, 2)}\n\`\`\`\n\n🎯 **Next:** Creating RFP for agent hiring...`,
         ts: Date.now(),
         id: `plan-details-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         loadingState: 'completed'
@@ -211,8 +216,9 @@ export default function ChatPage() {
         } catch (error) {
             console.error('Failed to make GET request:', error);
         }
-        // Summarize API service step for final output
-        apiServiceSummaries.push(`${stepTag}: ${step?.name || step?.capability || 'api-service'} ${data ? '(ok)' : '(pending)'}`);
+        // Summarize API service step for final output with budget
+        const svcBudget = typeof step?.budget_usd === 'number' ? `$${Number(step.budget_usd).toFixed(4)}` : 'n/a';
+        apiServiceSummaries.push(`${stepTag}: ${step?.name || step?.capability || 'api-service'} - Budget: ${svcBudget} ${data ? '(ok)' : '(pending)'}`);
         continue;
       }
       else if (step?.type === 'rfp') {
@@ -385,7 +391,8 @@ export default function ChatPage() {
       if (apiServiceSummaries.length > 0) {
         finalContent += `**API Services:**\n- ${apiServiceSummaries.join('\n- ')}\n\n`;
       }
-      finalContent += `**Total Cost:** $${amount_to_pay.toFixed(2)}\n\n`;
+      finalContent += `**Agent Service Fee:** $${hiredAgent.price_usd}\n`;
+      finalContent += `**Total Cost:** $${amount_to_pay.toFixed(4)}\n\n`;
       finalContent += `_(python-agent executed; check console for decision/logs)_\n\n`;
       // finalContent += `**Status:** ${runData.ok ? '✅ Success' : '❌ Failed'}\n\n`;
 
@@ -460,8 +467,8 @@ export default function ChatPage() {
                   <MessageCircle className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-white">DeFi Agent Chat</h1>
-                  <p className="text-blue-100 text-sm">Ask me anything about DeFi strategies</p>
+                  <h1 className="text-xl font-bold text-white"> Agent Chat</h1>
+                  <p className="text-blue-100 text-sm">Ask me anything</p>
                 </div>
               </div>
               <div className="flex items-center space-x-2">

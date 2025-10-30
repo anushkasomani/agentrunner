@@ -55,7 +55,7 @@ function formatTime(timestamp: number): string {
 function getLoadingAnimation(loadingState: string): string {
   switch (loadingState) {
     case 'planning':
-      return '🤖 Planning your DeFi strategy...';
+      return '🤖 Planning your strategy...';
     case 'rfp':
       return '📋 Creating Request for Proposal...';
     case 'offers':
