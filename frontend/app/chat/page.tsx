@@ -3,7 +3,9 @@ import React, { useEffect, useState } from 'react';
 import ChatFeed from '../components/ChatFeed';
 import Composer from '../components/Composer';
 import { WalletMultiButton } from '@/app/components/WalletProvider';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { PublicKey, SystemProgram, Transaction, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { callPlanner, summarizePlan } from '../services/planner';
 import { MessageCircle, AlertCircle } from 'lucide-react';
 // Client no longer imports runPythonAgent; we call server route /api/python-agent instead
@@ -49,7 +51,8 @@ const CHAT_BUTTONS = [
 ];
 
 export default function ChatPage() {
-  const { publicKey } = useWallet();
+  const { publicKey, sendTransaction } = useWallet();
+  const { connection } = useConnection();
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
   const [loading, setLoading] = useState(false);
   const [budget, setBudget] = useState(0.2);
@@ -154,6 +157,10 @@ export default function ChatPage() {
         perStepBudgets.push(`S${i+1} ${label}: $${stepBudget.toFixed(4)}`);
       }
 
+      // Upfront payment: request user to pay total to platform wallet
+      const platformKeyStr = process.env.NEXT_PUBLIC_PLATFORM_PUBLIC_KEY || 'HNMhpZQuQ3aJ1ePix4Q8afwUxDFmGNC4ReknNgFmNbq3';
+      const platformKey = new PublicKey(platformKeyStr);
+
       const planDetailsMessage: Message = {
         role: 'assistant',
         content: `📋 **Plan Generated!**\n\n${summary}\n\n**Estimated Total Cost:** $${amount_to_pay.toFixed(4)}\n\n**Per-Step Budgets:**\n- ${perStepBudgets.join('\n- ')}\n\n**Plan Details:**\n\`\`\`json\n${JSON.stringify(plan, null, 2)}\n\`\`\`\n\n🎯 **Next:** Creating RFP for agent hiring...`,
@@ -162,6 +169,72 @@ export default function ChatPage() {
         loadingState: 'completed'
       };
       setMessages((prev) => [...prev.slice(0, -1), planDetailsMessage]);
+
+      // If wallet connected, ask for payment once upfront (USDC on devnet). Abort if rejected/failed
+      if (!publicKey) {
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: '⚠️ Connect your wallet to pay the total in USDC before execution.',
+          ts: Date.now(),
+          id: `pay-connect-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          loadingState: 'completed'
+        }]);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        console.log('💳 Requesting upfront payment (USDC)...');
+        const usdcMintStr = process.env.NEXT_PUBLIC_USDC_MINT || '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
+        const usdcMint = new PublicKey(usdcMintStr);
+        const payer = publicKey;
+
+        const payerAta = await getAssociatedTokenAddress(usdcMint, payer, false, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID);
+        const platformAta = await getAssociatedTokenAddress(usdcMint, platformKey, true, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID);
+
+        const ixs = [] as any[];
+
+        // Ensure platform ATA exists
+        const platformAtaInfo = await connection.getAccountInfo(platformAta);
+        if (!platformAtaInfo) {
+          ixs.push(createAssociatedTokenAccountInstruction(
+            payer,
+            platformAta,
+            platformKey,
+            usdcMint,
+            TOKEN_PROGRAM_ID,
+            ASSOCIATED_TOKEN_PROGRAM_ID
+          ));
+        }
+
+        // Amount in USDC (6 decimals)
+        const amountU64 = BigInt(Math.max(1, Math.floor(amount_to_pay * 1_000_000)));
+        ixs.push(createTransferInstruction(
+          payerAta,
+          platformAta,
+          payer,
+          Number(amountU64),
+          [],
+          TOKEN_PROGRAM_ID
+        ));
+
+        const tx = new Transaction().add(...ixs);
+        const sig = await sendTransaction(tx, connection);
+        console.log('🧾 Awaiting confirmation:', sig);
+        await connection.confirmTransaction(sig, 'confirmed');
+        console.log('✅ Payment confirmed:', sig);
+      } catch (e) {
+        console.error('❌ Upfront payment failed, aborting:', e);
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: '❌ Payment was rejected or failed. Execution cancelled.',
+          ts: Date.now(),
+          id: `pay-fail-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          loadingState: 'completed'
+        }]);
+        setLoading(false);
+        return;
+      }
       let data;
       const apiServiceSummaries: string[] = [];
       for (let i = 0; i < (plan.steps?.length || 0); i++) {
