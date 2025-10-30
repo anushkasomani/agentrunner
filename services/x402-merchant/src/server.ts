@@ -94,6 +94,7 @@ app.get("/get_invoices", async(req, res)=>{
   return res.json({ok:true, invoices: invoicesObject})
 })
 
+// you can comment out this to handle refund 
 // app.post("/refund", async (req, res) => {
 //   const { invoice, to, amount } = req.body || {};
 //   const inv = INVOICES.get(String(invoice));

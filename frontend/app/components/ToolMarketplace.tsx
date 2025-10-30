@@ -268,7 +268,7 @@ export default function ToolMarketplace({ onToolSelect, selectedTools, onClose }
                     </div>
                     <div className="text-right">
                       <div className="text-sm font-medium text-gray-900 dark:text-white">
-                        {tool.usage} ${tool.price.toFixed(2)}
+                        {tool.usage} ${tool.price.toFixed(4)}
                       </div>
                     </div>
                   </div>
@@ -302,7 +302,7 @@ export default function ToolMarketplace({ onToolSelect, selectedTools, onClose }
                     </div>
                     <div className="text-right">
                       <div className="text-sm font-medium text-gray-900 dark:text-white">
-                        {tool.usage} ${tool.price.toFixed(2)}
+                        {tool.usage} ${tool.price.toFixed(4)}
                       </div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">
                         per call
