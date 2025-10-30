@@ -5,10 +5,7 @@ import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { 
   PhantomWalletAdapter, 
-  SolflareWalletAdapter,
-  TorusWalletAdapter,
-  CoinbaseWalletAdapter,
-  CloverWalletAdapter
+  SolflareWalletAdapter
 } from '@solana/wallet-adapter-wallets';
 import {
   WalletModalProvider,
@@ -33,10 +30,7 @@ export const WalletContextProvider: FC<WalletContextProviderProps> = ({ children
   const wallets = useMemo(
     () => [
       new PhantomWalletAdapter({ network }),
-      new SolflareWalletAdapter({ network }),
-      new TorusWalletAdapter({ network }),
-      new CoinbaseWalletAdapter({ network }),
-      new CloverWalletAdapter({ network }),
+      new SolflareWalletAdapter({ network })
     ],
     [network]
   );

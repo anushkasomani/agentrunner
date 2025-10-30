@@ -43,7 +43,7 @@ TIMEOUT = 60
 def generate_images(prompt: str, count: int = 5, size: str = "1024x1024", style: str = "professional"):
     """Generate images using DALL-E API"""
     headers = {
-        "Authorization": f"Bearer {OPENAI_API_KEY}",
+        # "Authorization": f"Bearer {OPENAI_API_KEY}",
         "Content-Type": "application/json"
     }
     
