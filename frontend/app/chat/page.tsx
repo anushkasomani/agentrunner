@@ -157,94 +157,34 @@ export default function ChatPage() {
         perStepBudgets.push(`S${i+1} ${label}: $${stepBudget.toFixed(4)}`);
       }
 
-      // Upfront payment: request user to pay total to platform wallet
-      const platformKeyStr = process.env.NEXT_PUBLIC_PLATFORM_PUBLIC_KEY || 'HNMhpZQuQ3aJ1ePix4Q8afwUxDFmGNC4ReknNgFmNbq3';
-      const platformKey = new PublicKey(platformKeyStr);
-
       const planDetailsMessage: Message = {
         role: 'assistant',
-        content: `📋 **Plan Generated!**\n\n${summary}\n\n**Estimated Total Cost:** $${amount_to_pay.toFixed(4)}\n\n**Per-Step Budgets:**\n- ${perStepBudgets.join('\n- ')}\n\n**Plan Details:**\n\`\`\`json\n${JSON.stringify(plan, null, 2)}\n\`\`\`\n\n🎯 **Next:** Creating RFP for agent hiring...`,
+        content: `📋 **Plan Generated!**\n\n${summary}\n\n**Estimated Total Cost:** $${amount_to_pay.toFixed(4)}\n\n**Per-Step Budgets:**\n- ${perStepBudgets.join('\n- ')}\n\n**Plan Details:**\n\`\`\`json\n${JSON.stringify(plan, null, 2)}\n\`\`\`\n\n`,
         ts: Date.now(),
         id: `plan-details-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         loadingState: 'completed'
       };
       setMessages((prev) => [...prev.slice(0, -1), planDetailsMessage]);
 
-      // If wallet connected, ask for payment once upfront (USDC on devnet). Abort if rejected/failed
-      if (!publicKey) {
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: '⚠️ Connect your wallet to pay the total in USDC before execution.',
-          ts: Date.now(),
-          id: `pay-connect-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-          loadingState: 'completed'
-        }]);
-        setLoading(false);
-        return;
-      }
 
-      try {
-        console.log('💳 Requesting upfront payment (USDC)...');
-        const usdcMintStr = process.env.NEXT_PUBLIC_USDC_MINT || '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
-        const usdcMint = new PublicKey(usdcMintStr);
-        const payer = publicKey;
-
-        const payerAta = await getAssociatedTokenAddress(usdcMint, payer, false, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID);
-        const platformAta = await getAssociatedTokenAddress(usdcMint, platformKey, true, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID);
-
-        const ixs = [] as any[];
-
-        // Ensure platform ATA exists
-        const platformAtaInfo = await connection.getAccountInfo(platformAta);
-        if (!platformAtaInfo) {
-          ixs.push(createAssociatedTokenAccountInstruction(
-            payer,
-            platformAta,
-            platformKey,
-            usdcMint,
-            TOKEN_PROGRAM_ID,
-            ASSOCIATED_TOKEN_PROGRAM_ID
-          ));
-        }
-
-        // Amount in USDC (6 decimals)
-        const amountU64 = BigInt(Math.max(1, Math.floor(amount_to_pay * 1_000_000)));
-        ixs.push(createTransferInstruction(
-          payerAta,
-          platformAta,
-          payer,
-          Number(amountU64),
-          [],
-          TOKEN_PROGRAM_ID
-        ));
-
-        const tx = new Transaction().add(...ixs);
-        const sig = await sendTransaction(tx, connection);
-        console.log('🧾 Awaiting confirmation:', sig);
-        await connection.confirmTransaction(sig, 'confirmed');
-        console.log('✅ Payment confirmed:', sig);
-      } catch (e) {
-        console.error('❌ Upfront payment failed, aborting:', e);
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: '❌ Payment was rejected or failed. Execution cancelled.',
-          ts: Date.now(),
-          id: `pay-fail-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-          loadingState: 'completed'
-        }]);
-        setLoading(false);
-        return;
-      }
       let data;
       const apiServiceSummaries: string[] = [];
       for (let i = 0; i < (plan.steps?.length || 0); i++) {
         const step = plan.steps[i];
         const stepTag = `S${i + 1}`;
         if (isApiService(step)) {
+          const endpoint = step?.inputs?.endpoint || '';
+          const queryParams = step?.inputs?.queryParams || {};
           try {
+            if (endpoint.includes(':8000') || endpoint.includes('localhost:8000')) {
+            // OHLCV API (can be base URL or full path)
             console.log('Making request to OHLCV API...');
-            
-            const response = await fetch(`http://localhost:8000/ohlcv?symbol=${step?.inputs?.queryParams?.symbol || step?.inputs?.symbol}&timeframe=${step?.inputs?.queryParams?.timeframe || step?.inputs?.timeframe}`);
+            const base = endpoint.includes('/ohlcv') ? endpoint : `${endpoint.replace(/\/$/, '')}/ohlcv`;
+            const symbol = queryParams.symbol || step?.inputs?.symbol;
+            const timeframe = queryParams.timeframe || step?.inputs?.timeframe;
+            const vsCurrency = queryParams.vs_currency || 'usd';
+            const url = `${base}?symbol=${symbol}&timeframe=${timeframe}&vs_currency=${vsCurrency}`;
+            const response = await fetch(url);
             console.log(response.status)
             if(response.status === 402) {
                 console.log('Payment required');
@@ -264,7 +204,7 @@ export default function ChatPage() {
                 console.log("Payment successful", payment);
                 
                 // Make second request with payment headers
-                const response2 = await fetch(`http://localhost:8000/ohlcv?symbol=${step?.inputs?.queryParams?.symbol || step?.inputs?.symbol}&timeframe=${step?.inputs?.queryParams?.timeframe || step?.inputs?.timeframe}`, {
+                const response2 = await fetch(url, {
                     headers: {
                         'X-402-Invoice': invoiceId,
                         'X-402-Proof-Tx': payment.txid,
@@ -286,12 +226,27 @@ export default function ChatPage() {
             } else {
                 console.log('Payment successful');
             }
+            } else if (endpoint.includes(':8010/shorten') || endpoint.includes('127.0.0.1:8010/shorten')) {
+              console.log('Calling Link Shortener API...');
+              const resp = await fetch(step?.inputs?.endpoint || 'http://127.0.0.1:8010/shorten', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(step?.inputs?.body || { url: step?.inputs?.url, price_usd: step?.budget_usd })
+              });
+              const j = await resp.json();
+              console.log('Short link response:', j);
+              apiServiceSummaries.push(`${stepTag}: link_shortener - Budget: $${Number(step?.budget_usd || 0).toFixed(4)} (short: ${j?.short || 'n/a'})`);
+            } else {
+              console.log('Unknown API service endpoint; skipping call.');
+            }
         } catch (error) {
             console.error('Failed to make GET request:', error);
         }
         // Summarize API service step for final output with budget
         const svcBudget = typeof step?.budget_usd === 'number' ? `$${Number(step.budget_usd).toFixed(4)}` : 'n/a';
-        apiServiceSummaries.push(`${stepTag}: ${step?.name || step?.capability || 'api-service'} - Budget: ${svcBudget} ${data ? '(ok)' : '(pending)'}`);
+        if (!endpoint.includes(':8010/shorten')) {
+          apiServiceSummaries.push(`${stepTag}: ${step?.name || step?.capability || 'api-service'} - Budget: ${svcBudget} ${data ? '(ok)' : '(pending)'}`);
+        }
         continue;
       }
       else if (step?.type === 'rfp') {
@@ -401,6 +356,106 @@ export default function ChatPage() {
         loadingState: 'executing'
       };
       setMessages((prev) => [...prev.slice(0, -1), hiredAgentMessage]);
+
+      // Single payment AFTER hiring: RFP budget + API budgets + agent fee
+      const rfpStep = plan.steps.find((s: any) => s?.type === 'rfp');
+      const rfpBudget = Number(rfpStep?.budget_usd || 0);
+      const apiBudgets = (plan.steps || [])
+        .filter((s: any) => s?.type === 'api-service')
+        .reduce((sum: number, s: any) => sum + (Number(s?.budget_usd || 0)), 0);
+      const agentFee = Number(hiredAgent.price_usd || 0);
+      const totalToPay = rfpBudget + apiBudgets + agentFee;
+      console.log('💳 Payment breakdown:', { rfpBudget, apiBudgets, agentFee, totalToPay });
+
+      if (totalToPay > 0) {
+        if (!publicKey) {
+          setMessages(prev => [...prev, { role:'assistant', content:'⚠️ Connect wallet to pay total in USDC.', ts:Date.now(), id:`pay-connect-${Date.now()}-${Math.random().toString(36).slice(2)}`, loadingState:'completed' }]);
+          setLoading(false);
+          return;
+        }
+        try {
+          const platformKeyStr = process.env.NEXT_PUBLIC_PLATFORM_PUBLIC_KEY || 'HNMhpZQuQ3aJ1ePix4Q8afwUxDFmGNC4ReknNgFmNbq3';
+          const platformKey = new PublicKey(platformKeyStr);
+          const usdcMintStr = process.env.NEXT_PUBLIC_USDC_MINT || '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
+          const usdcMint = new PublicKey(usdcMintStr);
+          const payer = publicKey;
+          const payerAta = await getAssociatedTokenAddress(usdcMint, payer, false, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID);
+          const platformAta = await getAssociatedTokenAddress(usdcMint, platformKey, true, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID);
+          const ixs:any[] = [];
+          const platformAtaInfo = await connection.getAccountInfo(platformAta);
+          if (!platformAtaInfo) {
+            ixs.push(createAssociatedTokenAccountInstruction(payer, platformAta, platformKey, usdcMint, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID));
+          }
+          const amountU64 = BigInt(Math.max(1, Math.floor(totalToPay * 1_000_000)));
+          ixs.push(createTransferInstruction(payerAta, platformAta, payer, Number(amountU64), [], TOKEN_PROGRAM_ID));
+          const tx = new Transaction().add(...ixs);
+          
+          // Let sendTransaction handle blockhash and fee payer
+          const sig = await sendTransaction(tx, connection, {
+            skipPreflight: false,
+            maxRetries: 3
+          });
+          console.log('🧾 Transaction sent:', sig);
+          
+          // Poll for confirmation with timeout and retry
+          let confirmed = false;
+          let attempts = 0;
+          const maxAttempts = 60; // 60 seconds (1 second intervals)
+          
+          while (!confirmed && attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            try {
+              const status = await connection.getSignatureStatus(sig);
+              if (status?.value?.confirmationStatus === 'confirmed' || status?.value?.confirmationStatus === 'finalized') {
+                confirmed = true;
+                console.log('✅ Payment confirmed:', sig);
+                break;
+              }
+              if (status?.value?.err) {
+                throw new Error(`Transaction failed: ${JSON.stringify(status.value.err)}`);
+              }
+            } catch (checkErr) {
+              // Continue polling unless it's a definite error
+              console.log(`⏳ Waiting for confirmation... (${attempts + 1}/${maxAttempts})`);
+            }
+            attempts++;
+          }
+          
+          if (!confirmed) {
+            // Last check - sometimes timeout happens but tx actually succeeded
+            try {
+              const finalStatus = await connection.getSignatureStatus(sig);
+              if (finalStatus?.value?.confirmationStatus === 'confirmed' || finalStatus?.value?.confirmationStatus === 'finalized' || !finalStatus?.value?.err) {
+                console.log('✅ Payment confirmed (final check):', sig);
+                confirmed = true;
+              } else {
+                throw new Error('Transaction not confirmed within timeout period');
+              }
+            } catch (finalErr) {
+              throw new Error('Transaction not confirmed. Please check the transaction status manually.');
+            }
+          }
+        } catch (e: any) {
+          console.error('❌ Payment failed, aborting:', e);
+          let errorMsg = 'Payment failed. Execution cancelled.';
+          
+          if (e?.message?.includes('rejected') || e?.message?.includes('User rejected') || e?.name === 'UserRejectedRequestError') {
+            errorMsg = 'Payment rejected by user. Execution cancelled.';
+          } else if (e?.message?.includes('stopped') || e?.message?.includes('crashed') || e?.message?.includes('Snap')) {
+            errorMsg = 'Wallet error: Please check your wallet connection and try again.';
+          } else if (e?.message?.includes('not confirmed') || e?.message?.includes('timeout')) {
+            errorMsg = 'Payment confirmation timeout. Please check your transaction status and try again.';
+          } else if (e?.message?.includes('insufficient') || e?.message?.includes('balance')) {
+            errorMsg = 'Insufficient USDC balance. Please ensure you have enough tokens.';
+          } else if (e?.message) {
+            errorMsg = `Payment error: ${e.message}`;
+          }
+          
+          setMessages(prev => [...prev, { role:'assistant', content:`❌ ${errorMsg}`, ts:Date.now(), id:`pay-fail-${Date.now()}-${Math.random().toString(36).slice(2)}`, loadingState:'completed' }]);
+          setLoading(false);
+          return;
+        }
+      }
 
       // Step 5: Execute Python agent via server route using hired agent metadataUri
       console.log('⚡ Executing with hired agent...');
