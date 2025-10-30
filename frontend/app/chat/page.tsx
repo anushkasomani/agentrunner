@@ -1,5 +1,4 @@
 'use client';
-
 import React, { useEffect, useState } from 'react';
 import ChatFeed from '../components/ChatFeed';
 import Composer from '../components/Composer';
@@ -7,6 +6,7 @@ import { WalletMultiButton } from '@/app/components/WalletProvider';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { callPlanner, summarizePlan } from '../services/planner';
 import { MessageCircle, AlertCircle } from 'lucide-react';
+// Client no longer imports runPythonAgent; we call server route /api/python-agent instead
 
 interface Message {
   role: 'user' | 'assistant';
@@ -18,7 +18,7 @@ interface Message {
 
 const INITIAL_MESSAGE: Message = {
   role: 'assistant',
-  content: 'Tell me your DeFi goal…',
+  content: 'Tell me your goal…',
   ts: Date.now(),
   id: 'initial-message'
 };
@@ -115,6 +115,9 @@ export default function ChatPage() {
     };
     setMessages((prev) => [...prev, userMessage]);
     setLoading(true);
+    const isApiService = (s: any) =>
+      s?.type === 'api-service' || s?.kind === 'api-service' || s?.category === 'api-service';
+    
 
     try {
       // Step 1: Call planner
@@ -124,7 +127,7 @@ export default function ChatPage() {
       
       const planningMessage: Message = {
         role: 'assistant',
-        content: '🤖 Planning your DeFi strategy...',
+        content: '🤖 Planning your strategy...',
         ts: Date.now(),
         id: `planning-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         loadingState: 'planning'
@@ -140,16 +143,86 @@ export default function ChatPage() {
       console.log('📋 Plan summary:', summary);
 
       // Show plan details first
+      // Compute total cost and per-step budgets from plan
+      let amount_to_pay = 0;
+      const perStepBudgets: string[] = [];
+      for (let i = 0; i < (plan.steps?.length || 0); i++) {
+        const s = plan.steps[i] || {} as any;
+        const stepBudget = Number(s?.budget_usd || 0);
+        amount_to_pay += stepBudget;
+        const label = s?.name || s?.capability || s?.type || `step-${i+1}`;
+        perStepBudgets.push(`S${i+1} ${label}: $${stepBudget.toFixed(4)}`);
+      }
+
       const planDetailsMessage: Message = {
         role: 'assistant',
-        content: `📋 **Plan Generated!**\n\n${summary}\n\n**Plan Details:**\n\`\`\`json\n${JSON.stringify(plan, null, 2)}\n\`\`\`\n\n🎯 **Next:** Creating RFP for agent hiring...`,
+        content: `📋 **Plan Generated!**\n\n${summary}\n\n**Estimated Total Cost:** $${amount_to_pay.toFixed(4)}\n\n**Per-Step Budgets:**\n- ${perStepBudgets.join('\n- ')}\n\n**Plan Details:**\n\`\`\`json\n${JSON.stringify(plan, null, 2)}\n\`\`\`\n\n🎯 **Next:** Creating RFP for agent hiring...`,
         ts: Date.now(),
         id: `plan-details-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         loadingState: 'completed'
       };
       setMessages((prev) => [...prev.slice(0, -1), planDetailsMessage]);
-
-      // Step 2: Create RFP
+      let data;
+      const apiServiceSummaries: string[] = [];
+      for (let i = 0; i < (plan.steps?.length || 0); i++) {
+        const step = plan.steps[i];
+        const stepTag = `S${i + 1}`;
+        if (isApiService(step)) {
+          try {
+            console.log('Making request to OHLCV API...');
+            
+            const response = await fetch(`http://localhost:8000/ohlcv?symbol=${step?.inputs?.queryParams?.symbol || step?.inputs?.symbol}&timeframe=${step?.inputs?.queryParams?.timeframe || step?.inputs?.timeframe}`);
+            console.log(response.status)
+            if(response.status === 402) {
+                console.log('Payment required');
+                const body = await response.text();
+                const invoiceData = JSON.parse(body);
+                const invoiceId = invoiceData.id;
+                console.log('Invoice ID:', invoiceId);
+                
+                const payment = await fetch('/api/make-payment', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ invoice: body })
+                }).then(r => {
+                  if (!r.ok) throw new Error(`make-payment failed: ${r.status}`);
+                  return r.json();
+                });
+                console.log("Payment successful", payment);
+                
+                // Make second request with payment headers
+                const response2 = await fetch(`http://localhost:8000/ohlcv?symbol=${step?.inputs?.queryParams?.symbol || step?.inputs?.symbol}&timeframe=${step?.inputs?.queryParams?.timeframe || step?.inputs?.timeframe}`, {
+                    headers: {
+                        'X-402-Invoice': invoiceId,
+                        'X-402-Proof-Tx': payment.txid,
+                        'X-402-Proof-Mint': payment.mint,
+                        'X-402-Chain': payment.chain,
+                        'X-402-Amount': payment.amount.toString()
+                    }
+                });
+                console.log(response2.status);
+                if(response2.status === 200) {
+                    console.log('Data fetched successfully');
+                    data = await response2.json();
+                    console.log(data);
+                    // console.log('Running Python Agent...');
+                    console.log("checking next step")
+                } else {
+                    console.log('Failed to fetch data');
+                }
+            } else {
+                console.log('Payment successful');
+            }
+        } catch (error) {
+            console.error('Failed to make GET request:', error);
+        }
+        // Summarize API service step for final output with budget
+        const svcBudget = typeof step?.budget_usd === 'number' ? `$${Number(step.budget_usd).toFixed(4)}` : 'n/a';
+        apiServiceSummaries.push(`${stepTag}: ${step?.name || step?.capability || 'api-service'} - Budget: ${svcBudget} ${data ? '(ok)' : '(pending)'}`);
+        continue;
+      }
+      else if (step?.type === 'rfp') {
+      // Step 2: Create RFP (only for RFP steps)
       console.log('📋 Creating RFP...');
       const rfpMessage: Message = {
         role: 'assistant',
@@ -161,11 +234,11 @@ export default function ChatPage() {
       setMessages((prev) => [...prev, rfpMessage]);
 
       const rfpPayload = {
-        capability: plan.steps[0]?.capability || 'generic',
-        inputs: plan.steps[0]?.inputs || {},
-        constraints: plan.steps[0]?.constraints || {},
+        capability: step?.capability || 'generic',
+        inputs: step?.inputs || {},
+        constraints: step?.constraints || {},
         budget_usd: budgetAmount,
-        slo: plan.steps[0]?.slo || { p95_ms: 3000 }
+        slo: step?.slo || { p95_ms: 3000 }
       };
       console.log('📤 RFP payload:', JSON.stringify(rfpPayload, null, 2));
 
@@ -189,7 +262,7 @@ export default function ChatPage() {
       // Update with RFP success
       const rfpSuccessMessage: Message = {
         role: 'assistant',
-        content: `✅ **RFP Created!**\n\n**RFP ID:** \`${rfpId}\`\n**Capability:** ${plan.steps[0]?.capability || 'generic'}\n**Budget:** $${budgetAmount}\n\n💰 **Next:** Fetching agent offers...`,
+        content: `✅ **RFP Created!**\n\n**RFP ID:** \`${rfpId}\`\n**Capability:** ${step?.capability || 'generic'}\n**Budget:** $${budgetAmount}\n\n💰 **Next:** Fetching agent offers...`,
         ts: Date.now(),
         id: `rfp-success-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         loadingState: 'offers'
@@ -249,59 +322,79 @@ export default function ChatPage() {
       // Show hired agent details
       const hiredAgentMessage: Message = {
         role: 'assistant',
-        content: `🎯 **Agent Hired!**\n\n**Agent ID:** \`${hiredAgent.agent_id}\`\n**Price:** $${hiredAgent.price_usd}\n**ETA:** ${hiredAgent.eta_ms}ms\n**Score:** ${hiredAgent.score?.toFixed(2) || 'N/A'}\n\n⚡ **Next:** Executing transaction...`,
+        content: `🎯 **Agent Hired!**\n\n**Agent ID:** \`${hiredAgent.agent_identity}\`\n**Price:** $${hiredAgent.price_usd}\n**ETA:** ${hiredAgent.eta_ms}ms\n**Score:** ${hiredAgent.score?.toFixed(2) || 'N/A'}\n\n⚡ **Next:** Executing transaction...`,
         ts: Date.now(),
         id: `hired-agent-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         loadingState: 'executing'
       };
       setMessages((prev) => [...prev.slice(0, -1), hiredAgentMessage]);
 
-      // Step 5: Execute with hired agent
+      // Step 5: Execute Python agent via server route using hired agent metadataUri
       console.log('⚡ Executing with hired agent...');
-
-      const runPayload = {
-        inMint: plan.steps[0]?.inputs?.inMint || "So11111111111111111111111111111111111111112",
-        outMint: plan.steps[0]?.inputs?.outMint || "USDCoctVLVnvTXBEuP9s8hntucdJokbo17RwHuNXemT",
-        amount: plan.steps[0]?.inputs?.amount || "1000000",
-        slippageBps: plan.steps[0]?.constraints?.slippage_bps_max || 30,
-        pythPriceIds: plan.steps[0]?.inputs?.pythPriceIds || []
-      };
-      console.log('📤 Run payload:', JSON.stringify(runPayload, null, 2));
-
-      const runResponse = await fetch('/api/runner?path=/run', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(runPayload)
-      });
-
-      console.log('📥 Run response status:', runResponse.status);
-      if (!runResponse.ok) {
-        const errorText = await runResponse.text();
-        console.error('❌ Execution failed:', errorText);
-        throw new Error(`Execution failed: ${errorText}`);
+      try {
+        // fetch metadataUri for agent
+        const metaResp = await fetch(`/api/agents?agent_identity=${encodeURIComponent(hiredAgent.agent_identity)}`);
+        const metaJson = await metaResp.json();
+        if (!metaResp.ok || !metaJson?.ok || !metaJson?.metadataUri) {
+          console.warn('No metadataUri found for agent; skipping agent run');
+        } else {
+          const pyResp = await fetch('/api/python-agent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ohlcv: data, metadataUri: metaJson.metadataUri })
+          });
+          const pyJson = await pyResp.json();
+          if (!pyResp.ok || !pyJson?.ok) {
+            console.warn('python-agent failed:', pyJson?.error || 'unknown');
+          } else {
+            console.log('success:', pyJson.success);
+            if(pyJson.success) {
+              if(step?.capability==='sip'){
+                console.log("next step is to execute the tx i.e swapping");
+                const runPayload = {
+                  // inMint: step?.inputs?.inMint || "So11111111111111111111111111111111111111112",
+                  // outMint: step?.inputs?.outMint || "USDCoctVLVnvTXBEuP9s8hntucdJokbo17RwHuNXemT",
+                  inMint: "So11111111111111111111111111111111111111112",
+                  outMint: "USDCoctVLVnvTXBEuP9s8hntucdJokbo17RwHuNXemT",
+                  amount: step?.inputs?.budget_usd || "1000000",
+                  slippageBps: step?.constraints?.slippage_bps_max || 30,
+                  pythPriceIds: step?.inputs?.pythPriceIds || []
+                };
+                console.log('📤 Run payload:', JSON.stringify(runPayload, null, 2));
+                const runResponse = await fetch('/api/run-swap', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(runPayload)
+                });
+                const runJson = await runResponse.json();
+                console.log('run response:', runJson);
+                if(runJson.ok) {
+                  console.log("swap successful");
+                } else {
+                  console.log("swap failed");
+                }
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error invoking python-agent:', e);
       }
-
-      const runData = await runResponse.json();
-      console.log('✅ Execution completed:', JSON.stringify(runData, null, 2));
-
-      // Show execution details
-      const executionDetails = `
-**Transaction Details:**
-- **Input Mint:** \`${runPayload.inMint.slice(0, 8)}...${runPayload.inMint.slice(-8)}\`
-- **Output Mint:** \`${runPayload.outMint.slice(0, 8)}...${runPayload.outMint.slice(-8)}\`
-- **Amount:** ${runPayload.amount}
-- **Slippage:** ${runPayload.slippageBps} bps
-`;
 
       // Final success message
       let finalContent = `✅ **Execution Complete!**\n\n`;
       finalContent += `**Plan Summary:** ${summary}\n\n`;
       finalContent += `**Agent Details:**\n`;
-      finalContent += `- Agent ID: \`${hiredAgent.agent_id}\`\n`;
+      finalContent += `- Agent Identity: \`${hiredAgent.agent_identity}\`\n`;
       finalContent += `- Service Fee: $${hiredAgent.price_usd}\n`;
       finalContent += `- Score: ${hiredAgent.score?.toFixed(2) || 'N/A'}\n\n`;
-      finalContent += executionDetails;
-      finalContent += `**Status:** ${runData.ok ? '✅ Success' : '❌ Failed'}\n\n`;
+      if (apiServiceSummaries.length > 0) {
+        finalContent += `**API Services:**\n- ${apiServiceSummaries.join('\n- ')}\n\n`;
+      }
+      finalContent += `**Agent Service Fee:** $${hiredAgent.price_usd}\n`;
+      finalContent += `**Total Cost:** $${amount_to_pay.toFixed(4)}\n\n`;
+      finalContent += `_(python-agent executed; check console for decision/logs)_\n\n`;
+      // finalContent += `**Status:** ${runData.ok ? '✅ Success' : '❌ Failed'}\n\n`;
 
       if (!publicKey) {
         finalContent += `_💡 Connect your wallet to execute future plans._\n\n`;
@@ -319,6 +412,23 @@ export default function ChatPage() {
 
       setMessages((prev) => [...prev.slice(0, -1), finalMessage]);
       console.log('🎉 Complete execution flow finished successfully!');
+    } else {
+      // Unknown or not-yet-supported step type
+      console.warn(`Step ${stepTag} type not implemented:`, step?.type);
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: `ℹ️ **${stepTag}:** Step type "${step?.type ?? 'unknown'}" is not implemented yet. Skipping.`,
+          ts: Date.now(),
+          id: `step-skip-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          loadingState: 'completed'
+        }
+      ]);
+      continue;
+    }
+
+      }
 
     } catch (error) {
       console.error('💥 Execution error:', error);
@@ -357,8 +467,8 @@ export default function ChatPage() {
                   <MessageCircle className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-white">DeFi Agent Chat</h1>
-                  <p className="text-blue-100 text-sm">Ask me anything about DeFi strategies</p>
+                  <h1 className="text-xl font-bold text-white"> Agent Chat</h1>
+                  <p className="text-blue-100 text-sm">Ask me anything</p>
                 </div>
               </div>
               <div className="flex items-center space-x-2">
