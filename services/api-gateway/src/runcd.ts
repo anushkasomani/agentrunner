@@ -1,9 +1,15 @@
+import express from "express";
+import cors from "cors";
 import axios from "axios";
 import Docker from "dockerode";
 import * as fs from "fs/promises";
 import * as nodefs from "fs";
 import { dir as makeTempDir } from "tmp-promise";
 import * as path from "path";
+
+const app = express();
+app.use(cors());
+app.use(express.json({ limit: "1mb" }));
 
 const docker = new Docker({ socketPath: "/var/run/docker.sock" });
 
@@ -45,7 +51,7 @@ async function ensureImage(image: string) {
   const have = images.some((img) => (img.RepoTags || []).includes(image));
   if (have) return;
   await new Promise<void>((resolve, reject) => {
-    docker.pull(image, (err, stream) => {
+    docker.pull(image, (err: Error | null, stream: any) => {
       if (err) return reject(err);
       docker.modem.followProgress(stream, (e: any) => (e ? reject(e) : resolve()));
     });
@@ -153,8 +159,36 @@ export async function runPythonAgent(ohlcv: any, metadataUri: string) {
   }
 }
 
-// // Auto-run when called directly
-// (async () => {
-//   const result = await runPythonAgent();
-//   console.log("✅ Final Result:", result);
-// })();
+// API endpoint for running Python agent
+app.post('/python-agent', async (req, res) => {
+  try {
+    const { ohlcv, metadataUri } = req.body;
+    
+    if (!metadataUri) {
+      return res.status(400).json({ ok: false, error: 'metadataUri required' });
+    }
+
+    const result = await runPythonAgent(ohlcv, metadataUri);
+    console.log("agent executed successfully", result);
+    res.json({ ok: true, ...result });
+  } catch (err: any) {
+    console.error('Python agent error:', err);
+    res.status(500).json({ ok: false, error: err.message || String(err) });
+  }
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', service: 'python-agent-api' });
+});
+
+// Only start the server if this file is run directly, not when imported
+// For ESM, check if import.meta.url matches the main module
+const isMainModule = import.meta.url === `file://${process.argv[1]}` || 
+                     process.argv[1]?.includes('runcd.ts') ||
+                     process.argv[1]?.includes('runcd.js');
+
+if (isMainModule && !process.env.NEXT_PHASE) {
+  const PORT = process.env.PORT || 7065;
+  app.listen(PORT, () => console.log(`Python Agent API listening on :${PORT}`));
+}

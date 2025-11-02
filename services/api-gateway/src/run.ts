@@ -181,4 +181,12 @@ app.post('/run-swap', async(req,res)=>{
     res.status(runnerResp.status).set(Object.fromEntries(runnerResp.headers)).send(await runnerResp.text());
 });
 
-app.listen(7050, () => console.log("Run service listening on :7050"));
+// Only start the server if this file is run directly, not when imported
+// Skip during Next.js builds or when imported by other modules
+const shouldStartServer = 
+  typeof require !== 'undefined' && require.main === module &&
+  !process.env.NEXT_PHASE;
+
+if (shouldStartServer) {
+  app.listen(7050, () => console.log("Run service listening on :7050"));
+}

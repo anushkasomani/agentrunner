@@ -2,8 +2,7 @@
 export const runtime = 'nodejs';
 
 import { NextResponse } from 'next/server';
-// adjust the relative path as per your repo layout
-import { makePayment } from '../../../../services/api-gateway/src/run';
+import { makePayment } from '../../lib/makePayment';
 
 export async function POST(req: Request) {
   try {

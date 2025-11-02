@@ -5,15 +5,24 @@
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "dev": "node --watch dist/server.js"
+    "dev": "node --watch dist/server.js",
+    "start:python-agent": "tsx src/runcd.ts",
+    "dev:python-agent": "tsx --watch src/runcd.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "0.29.0",
     "@solana/web3.js": "^1.98.4",
+    "axios": "^1.7.7",
     "cors": "2.8.5",
+    "dockerode": "^4.0.0",
     "express": "4.19.2",
     "node-fetch": "3.3.2",
+    "tmp-promise": "^3.0.3",
     "uuid": "9.0.1",
     "zod": "3.23.8"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "^5.0.0"
   }
 }
