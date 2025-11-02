@@ -4,21 +4,16 @@ import * as fs from "fs/promises";
 import * as nodefs from "fs";
 import { dir as makeTempDir } from "tmp-promise";
 import * as path from "path";
-
+import express from "express";
+import cors from "cors";
 const docker = new Docker({ socketPath: "/var/run/docker.sock" });
 
-const METADATA_URI =
-  process.env.SIP_METADATA_URI ||
-  "https://moccasin-broad-kiwi-732.mypinata.cloud/ipfs/bafkreidk36gurq7w7o7ndpc5kiqggs6l4o642t6tfogf2chwxrt7pehnwa";
-
-const DATA_AGENT_URL =
-  process.env.DATA_AGENT_URL || "https://agentrunner.onrender.com";
-const DATA_AGENT_KEY =
-  process.env.DATA_AGENT_KEY || "crypto-ohlcv-secret-key-2024";
+const app = express();
+app.use(cors());
+app.use(express.json({ limit: "1mb" }));
 
 const SYMBOL = process.env.SIP_SYMBOL || "btc";        // e.g. btc, eth, sol
 const TIMEFRAME = process.env.SIP_TIMEFRAME || "1d";   // e.g. 5m, 1h, 1d
-
 const PY_IMAGE = process.env.PY_IMAGE || "python:3.10-slim";
 
 /**
@@ -45,7 +40,7 @@ async function ensureImage(image: string) {
   const have = images.some((img) => (img.RepoTags || []).includes(image));
   if (have) return;
   await new Promise<void>((resolve, reject) => {
-    docker.pull(image, (err, stream) => {
+    docker.pull(image, (err: any, stream: any) => {
       if (err) return reject(err);
       docker.modem.followProgress(stream, (e: any) => (e ? reject(e) : resolve()));
     });
@@ -61,6 +56,13 @@ async function ensureImage(image: string) {
  * - runs python container with INPUT_JSON
  * - captures logs, tries to parse {decision: "..."}
  */
+
+app.post("/run-code", async (req, res) => {
+  const { ohlcv, metadataUri } = req.body;
+  const result = await runPythonAgent(ohlcv, metadataUri);
+  res.json(result);
+});
+
 export async function runPythonAgent(ohlcv: any, metadataUri: string) {
   const tmp = await makeTempDir({ unsafeCleanup: true });
   try {
@@ -153,8 +155,4 @@ export async function runPythonAgent(ohlcv: any, metadataUri: string) {
   }
 }
 
-// // Auto-run when called directly
-// (async () => {
-//   const result = await runPythonAgent();
-//   console.log("✅ Final Result:", result);
-// })();
+app.listen(6050, () => console.log("Run service listening on :6050"));

@@ -17,11 +17,13 @@ async function syncAgentsFromBlockchain() {
     console.log("Syncing agents from frontend...");
     
     // Fetch agents from frontend API
-    const response = await fetch('http://localhost:3000/api/agents');
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    const response = await fetch(`${frontendUrl}/api/agents`);
     if (!response.ok) {
       console.log("Could not fetch agents from frontend, skipping sync");
       return;
     }
+
     
     const data = await response.json() as any;
     if (!data.ok || !data.agents) {

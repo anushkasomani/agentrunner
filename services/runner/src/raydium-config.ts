@@ -3,16 +3,12 @@ import { Connection, Keypair, clusterApiUrl } from '@solana/web3.js'
 import { NATIVE_MINT, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token'
 import bs58 from 'bs58'
 
-export const FEE_PAYER_SECRET_KEY=[94,21,75,106,120,153,168,235,114,39,104,0,255,148,42,122,107,26,9,2,228,10,81,11,232,159,190,211,236,16,59,232,243,51,153,0,152,19,129,196,31,240,193,61,248,14,75,207,158,187,213,67,243,131,40,248,248,198,180,155,152,217,219,178]
+export const FEE_PAYER_SECRET_KEY=process.env.FEE_PAYER_SECRET_KEY || [94,21,75,106,120,153,168,235,114,39,104,0,255,148,42,122,107,26,9,2,228,10,81,11,232,159,190,211,236,16,59,232,243,51,153,0,152,19,129,196,31,240,193,61,248,14,75,207,158,187,213,67,243,131,40,248,248,198,180,155,152,217,219,178]
 // Environment variables
-const WALLET_SECRET_KEY = FEE_PAYER_SECRET_KEY || process.env.RUNNER_SECRET_KEY
+const WALLET_SECRET_KEY = FEE_PAYER_SECRET_KEY
 const RPC_URL = process.env.SOLANA_RPC_URL || clusterApiUrl('devnet')
 
-if (!WALLET_SECRET_KEY) {
-  throw new Error('FEE_PAYER_SECRET_KEY or RUNNER_SECRET_KEY environment variable is required')
-}
-
-export const owner: Keypair = Keypair.fromSecretKey(new Uint8Array(FEE_PAYER_SECRET_KEY))
+export const owner: Keypair = Keypair.fromSecretKey(new Uint8Array(FEE_PAYER_SECRET_KEY as any))
 export const connection = new Connection(RPC_URL)
 export const txVersion = TxVersion.V0 // Use V0 for versioned transactions
 const cluster = 'devnet' as 'mainnet' | 'devnet'

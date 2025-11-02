@@ -155,11 +155,21 @@ const { goal, context, constraints, budget_usd, selectedTools } = req.body || {}
 // Fetch available API services from the platform
 let availableServices = [];
 try {
-  const response = await fetch('http://localhost:3000/api/agents');
+  // Ensure FRONTEND_URL is set and use fallback if not
+  const baseUrl =
+    (typeof process !== "undefined" &&
+      process.env &&
+      process.env.FRONTEND_URL &&
+      `${process.env.FRONTEND_URL}`) ||
+    "http://localhost:3000";
+  const apiUrl = `${baseUrl.replace(/\/$/, "")}/api/agents`;
+  const response = await fetch(apiUrl);
   const data = await response.json();
   if (data.ok && data.agents) {
     availableServices = data.agents
-      .filter((agent: any) => agent.serviceType === 'api' || agent.service_type === 'api')
+      .filter(
+        (agent: any) => agent.serviceType === "api" || agent.service_type === "api"
+      )
       .map((agent: any) => {
         let serviceConfig = {};
         try {

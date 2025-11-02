@@ -10,7 +10,7 @@ import { owner } from "./raydium-config.ts";
 import { anchorMerkleRoot } from "./anchorMerkle.ts";
 import { AgentService } from "./agentService.ts";
 
-const RUNNER_PUBKEY="HNMhpZQuQ3aJ1ePix4Q8afwUxDFmGNC4ReknNgFmNbq3"
+const RUNNER_PUBKEY=process.env.RUNNER_PUBKEY || "HNMhpZQuQ3aJ1ePix4Q8afwUxDFmGNC4ReknNgFmNbq3"
 const app = express();
 app.use(express.json({ limit: "1mb" }));
 
@@ -30,7 +30,7 @@ app.post("/run/skill/swap", async (req, res) => {
     console.log("swapp successfull. output is : ", out)
 
     const receipt: Receipt = {
-      runner_pubkey: RUNNER_PUBKEY || "HNMhpZQuQ3aJ1ePix4Q8afwUxDFmGNC4ReknNgFmNbq3",
+      runner_pubkey: RUNNER_PUBKEY,
       agent: "swap",
       task_id: uuid(),
       when_unix: Math.floor(Date.now()/1000),

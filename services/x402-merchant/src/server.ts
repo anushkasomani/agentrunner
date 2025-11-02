@@ -8,9 +8,9 @@ const app = express();
 app.use(express.json());
 
 const CURRENCY = process.env.X402_CURRENCY || "USDC";
-const PAYTO_MINT = new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"); // USDC mint (devnet/mainnet)
+const PAYTO_MINT = new PublicKey(process.env.PAYTO_MINT || "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"); // USDC mint (devnet/mainnet)
 // Derive the correct ATA for merchant
-const MERCHANT_PUBKEY = new PublicKey("51j3b8cZkYwAeKA47rEGWs8vLm12RD82yAgHhYYhyimr");
+const MERCHANT_PUBKEY = new PublicKey(process.env.MERCHANT_PUBLIC_KEY || "51j3b8cZkYwAeKA47rEGWs8vLm12RD82yAgHhYYhyimr");
 let PAYTO_ADDRESS: PublicKey;
 
 // Initialize PAYTO_ADDRESS after connection is established

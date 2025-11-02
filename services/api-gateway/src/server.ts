@@ -15,11 +15,11 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 
-const RUNNER = "http://localhost:7001";
-const PLANNER = "http://localhost:7002";
-const X402 =  "http://localhost:7003";
-const BROKER =  "http://localhost:7004";
-const CERT =  "http://localhost:7005";
+const RUNNER = process.env.RUNNER_URL || "http://localhost:7001";
+const PLANNER = process.env.PLANNER_URL || "http://localhost:7002";
+const X402 = process.env.X402_URL || "http://localhost:7003";
+const BROKER = process.env.BROKER_URL || "http://localhost:7004";
+const CERT = process.env.CERT_URL || "http://localhost:7005";
 
 // --- On-chain (read) client setup
 const RPC = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";

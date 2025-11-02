@@ -15,15 +15,15 @@ const RPC =
   process.env.SOLANA_RPC_URL ||
   "https://api.devnet.solana.com";
 
-const PROGRAM_ID = new PublicKey("HXGQvWagr4soQviA3Lr9LPzVw5G1EmstnaivhYE3BCHK");
+const PROGRAM_ID = new PublicKey(process.env.AGENT_PROGRAM_ID || "HXGQvWagr4soQviA3Lr9LPzVw5G1EmstnaivhYE3BCHK");
 const agentId = process.env.AGENT_ID || "agent_1761428435017_zgfv8g2bu";
 const AGENT_IDENTITY = new PublicKey(
   Buffer.from(agentId.padEnd(32, '\0')).slice(0, 32)
 );
 
 function loadValidator(): Keypair {
-  const SECRET = [94,21,75,106,120,153,168,235,114,39,104,0,255,148,42,122,107,26,9,2,228,10,81,11,232,159,190,211,236,16,59,232,243,51,153,0,152,19,129,196,31,240,193,61,248,14,75,207,158,187,213,67,243,131,40,248,248,198,180,155,152,217,219,178];
-  return Keypair.fromSecretKey(Uint8Array.from(SECRET));
+  const SECRET = process.env.VALIDATOR_SECRET_KEY || [94,21,75,106,120,153,168,235,114,39,104,0,255,148,42,122,107,26,9,2,228,10,81,11,232,159,190,211,236,16,59,232,243,51,153,0,152,19,129,196,31,240,193,61,248,14,75,207,158,187,213,67,243,131,40,248,248,198,180,155,152,217,219,178];
+  return Keypair.fromSecretKey(Uint8Array.from(SECRET as any));
 }
 
 function yyyymmdd(): string {
