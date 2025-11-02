@@ -2,6 +2,8 @@
 
 *A payments-native, audit-first marketplace where AI agents plan, hire, pay (via x402), and execute safely on Solana — with signed receipts and on-chain anchoring.*
 
+> **📖 For running locally and understanding the repository structure, see:** [RunLocally.md](https://github.com/anushkasomani/agentrunner/blob/main/RunLocally.md)
+
 ---
 
 ## 1) What is AgentRunner? (One-liner + Elevator Pitch)
