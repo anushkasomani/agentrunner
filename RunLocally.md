@@ -200,51 +200,31 @@ npx ts-node src/server.ts
 ---
 
 
-### 5. API Gateway Services
+### 5. API Gateway
 
-The API Gateway has two services:
-
-#### Main API Gateway (Port 8080)
-
-**Purpose:** Main API gateway that routes requests to other services.
+**Purpose:** API gateway service for routing requests.
 
 ```bash
 cd services/api-gateway
 
-# Create .env file with:
+# Set all the env variables needed
 # RUNNER_URL=http://localhost:7001
 # PLANNER_URL=http://localhost:7002
 # X402_URL=http://localhost:7003
 # BROKER_URL=http://localhost:7004
 # CERT_URL=http://localhost:7005
 
+# Pull Python Docker image
+docker pull python:3.10-slim
+
+# Run the Python agent service (for POST /run-code)
+npx ts-node src/runcd.ts
+
+# Also run the main API gateway
 npx ts-node src/run.ts
 ```
 
-#### Python Agent Runner (Port 6050)
-
-**Purpose:** Executes Python agents using Docker containers.
-
-```bash
-cd services/api-gateway
-
-# Ensure Python Docker image is pulled
-docker pull python:3.10-slim
-
-# Run the Python agent service
-npx ts-node src/runcd.ts
-```
-
-**Endpoints:**
-- `POST /run-code` - Execute Python agent
-  - Body: `{ "ohlcv": [...], "metadataUri": "..." }`
-
-**Required Environment Variables:**
-- `PY_IMAGE` - Docker image for Python (default: `python:3.10-slim`)
-- `SIP_SYMBOL` - Trading symbol (default: `btc`)
-- `SIP_TIMEFRAME` - Timeframe (default: `1d`)
-
-**Note:** This service requires Docker to be running and Docker socket access.
+**Note:** Both `runcd.ts` (for `/run-code` POST request) and `run.ts` need to be running.
 
 ---
 
@@ -342,9 +322,8 @@ anchor deploy
 | Planner | 7002 | Task planning |
 | X402 Merchant | 7003 | Payment gateway |
 | Broker | 7004 | Agent marketplace |
-| Certifier | 7005 | Agent certification |
-| API Gateway | 8080 | Main API gateway |
-| Python Agent API | 6050 | Python agent execution |
+| API Gateway (run.ts) | 7050 | Main API gateway |
+| Python Agent API (runcd.ts) | 6050 | Python agent execution (/run-code) |
 | Python Main API | 8000 | OHLCV data API |
 | PostgreSQL | 5432 | Database |
 | Redis | 6379 | Cache/Queue |
@@ -371,16 +350,13 @@ cd services/x402-merchant && npx ts-node src/server.ts
 # Terminal 5: Runner
 cd services/runner && npx ts-node src/server.ts
 
-# Terminal 6: Certifier
-cd services/certifier && npx ts-node src/server.ts
-
-# Terminal 7: API Gateway
-cd services/api-gateway && npx ts-node src/server.ts
-
-# Terminal 8: Python Agent API
+# Terminal 6: API Gateway - Python Agent Service (for POST /run-code)
 cd services/api-gateway && npx ts-node src/runcd.ts
 
-# Terminal 9: Frontend
+# Terminal 7: API Gateway - Main Service
+cd services/api-gateway && npx ts-node src/run.ts
+
+# Terminal 8: Frontend
 cd frontend && npm run dev
 ```
 
